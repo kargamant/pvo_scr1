@@ -6,19 +6,19 @@ images/nexys4ddr/scr1/dhry21-o2.bin
 images/nexys4ddr/scr1/dhry21-o3lto.bin
 
 # Generated Vivado project
-nexys4ddr_scr1/nexys4ddr_scr1.cache/
-nexys4ddr_scr1/nexys4ddr_scr1.hw/
-nexys4ddr_scr1/nexys4ddr_scr1.ip_user_files/
-nexys4ddr_scr1/nexys4ddr_scr1.runs/
-nexys4ddr_scr1/nexys4ddr_scr1.sim/
+**/nexys4ddr_scr1/nexys4ddr_scr1.cache/
+**/nexys4ddr_scr1/nexys4ddr_scr1.hw/
+**/nexys4ddr_scr1/nexys4ddr_scr1.ip_user_files/
+**/nexys4ddr_scr1/nexys4ddr_scr1.runs/
+**/nexys4ddr_scr1/nexys4ddr_scr1.sim/
 
 # Ignore after authored sources/IP configs are moved elsewhere
-nexys4ddr_scr1/nexys4ddr_scr1.srcs/
-nexys4ddr_scr1/nexys4ddr_scr1.xpr
+**/nexys4ddr_scr1/nexys4ddr_scr1.srcs/
+**/nexys4ddr_scr1/nexys4ddr_scr1.xpr
 
 # Local experiments and captured ILA data
-nexys4ddr_scr1/big_ila_test/
-nexys4ddr_scr1/cache_staging/
+**/nexys4ddr_scr1/big_ila_test/
+**/nexys4ddr_scr1/cache_staging/
 
 # Vivado logs and crash files
 *.jou

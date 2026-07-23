@@ -15,7 +15,8 @@
 //`define SCR1_TRGT_FPGA_INTEL_MAX10   // ---> Uncomment if target platform is Intel MAX 10 FPGAs
 //`define SCR1_TRGT_FPGA_INTEL_ARRIAV  // ---> Uncomment if target platform is Intel Arria V FPGAs
 
-
+// Uncomment to enable local ILA debug instrumentation
+//`define SCR1_DEBUG_ILA
 
 
 

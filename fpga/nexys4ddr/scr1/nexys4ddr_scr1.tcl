@@ -136,6 +136,7 @@ set files [list \
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_mem_axi.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_timer.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_top_axi.sv"]"\
+ "[file normalize "$origin_dir/src/cache/scr1_cache_wrapper.sv"]"\
  "[file normalize "$origin_dir/src/nexys4ddr_scr1.sv"]"\
 ]
 add_files -norecurse -fileset $obj $files

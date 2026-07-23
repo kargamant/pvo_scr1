@@ -58,6 +58,32 @@ module scr1_dmem_router
     input   type_scr1_mem_resp_e            port2_resp
 );
 
+`ifdef SCR1_DEBUG_ILA
+ila_1 dmem_port0_debug_ila (
+    clk,
+    port0_req_ack,
+    port0_req,
+    port0_cmd,
+    port0_width,
+    port0_addr,
+    port0_wdata,
+    port0_rdata,
+    port0_resp
+);
+
+ila_1 dmem_port1_debug_ila (
+    clk,
+    port1_req_ack,
+    port1_req,
+    port1_cmd,
+    port1_width,
+    port1_addr,
+    port1_wdata,
+    port1_rdata,
+    port1_resp
+);
+`endif // SCR1_DEBUG_ILA
+
 //-------------------------------------------------------------------------------
 // Local types declaration
 //-------------------------------------------------------------------------------

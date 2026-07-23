@@ -40,6 +40,28 @@ module scr1_imem_router
     input   type_scr1_mem_resp_e            port1_resp
 );
 
+`ifdef SCR1_DEBUG_ILA
+ila_2 imem_port0_debug_ila(
+    clk,
+    port0_req_ack,
+    port0_req,
+    port0_cmd,
+    port0_addr,
+    port0_rdata,
+    port0_resp
+);
+
+ila_2 imem_port1_debug_ila(
+    clk,
+    port1_req_ack,
+    port1_req,
+    port1_cmd,
+    port1_addr,
+    port1_rdata,
+    port1_resp
+);
+`endif // SCR1_DEBUG_ILA
+
 //-------------------------------------------------------------------------------
 // Local types declaration
 //-------------------------------------------------------------------------------
