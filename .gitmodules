@@ -1,9 +1,3 @@
-[submodule "scr1"]
-	path = scr1
-	url = https://github.com/syntacore/scr1
-[submodule "fpga"]
-	path = fpga
-	url = https://github.com/syntacore/fpga-sdk-prj
 [submodule "sw/sc-bl"]
 	path = sw/sc-bl
 	url = https://github.com/syntacore/sc-bl
@@ -11,3 +5,15 @@
 	path = sw/zephyr
 	url = https://github.com/syntacore/zephyr
 	branch = scr1
+[submodule "scr1/dependencies/coremark"]
+	path = scr1/dependencies/coremark
+	url = https://github.com/eembc/coremark
+[submodule "scr1/dependencies/riscv-arch"]
+	path = scr1/dependencies/riscv-arch
+	url = https://github.com/riscv/riscv-arch-test
+[submodule "scr1/dependencies/riscv-compliance"]
+	path = scr1/dependencies/riscv-compliance
+	url = https://github.com/riscv/riscv-compliance
+[submodule "scr1/dependencies/riscv-tests"]
+	path = scr1/dependencies/riscv-tests
+	url = https://github.com/riscv/riscv-tests
