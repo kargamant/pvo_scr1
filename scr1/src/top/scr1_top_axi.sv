@@ -202,21 +202,21 @@ logic [`SCR1_DMEM_DWIDTH-1:0]                       axi_dmem_rdata;
 type_scr1_mem_resp_e                                axi_dmem_resp;
 
 `ifdef SCR1_TCM_EN
-// Instruction memory interface from router to TCM
-logic                                               tcm_imem_req_ack;
-logic                                               tcm_imem_req;
+// Instruction memory interface from router to TCM (mark_debug: probed by ILA to watch the test execute from TCM)
+(* mark_debug="true" *) logic                       tcm_imem_req_ack;
+(* mark_debug="true" *) logic                       tcm_imem_req;
 type_scr1_mem_cmd_e                                 tcm_imem_cmd;
-logic [`SCR1_IMEM_AWIDTH-1:0]                       tcm_imem_addr;
-logic [`SCR1_IMEM_DWIDTH-1:0]                       tcm_imem_rdata;
+(* mark_debug="true" *) logic [`SCR1_IMEM_AWIDTH-1:0] tcm_imem_addr;
+(* mark_debug="true" *) logic [`SCR1_IMEM_DWIDTH-1:0] tcm_imem_rdata;
 type_scr1_mem_resp_e                                tcm_imem_resp;
 
-// Data memory interface from router to TCM
-logic                                               tcm_dmem_req_ack;
-logic                                               tcm_dmem_req;
-type_scr1_mem_cmd_e                                 tcm_dmem_cmd;
-type_scr1_mem_width_e                               tcm_dmem_width;
-logic [`SCR1_DMEM_AWIDTH-1:0]                       tcm_dmem_addr;
-logic [`SCR1_DMEM_DWIDTH-1:0]                       tcm_dmem_wdata;
+// Data memory interface from router to TCM (mark_debug: probed by ILA to watch data land in TCM)
+(* mark_debug="true" *) logic                       tcm_dmem_req_ack;
+(* mark_debug="true" *) logic                       tcm_dmem_req;
+(* mark_debug="true" *) type_scr1_mem_cmd_e         tcm_dmem_cmd;
+(* mark_debug="true" *) type_scr1_mem_width_e       tcm_dmem_width;
+(* mark_debug="true" *) logic [`SCR1_DMEM_AWIDTH-1:0] tcm_dmem_addr;
+(* mark_debug="true" *) logic [`SCR1_DMEM_DWIDTH-1:0] tcm_dmem_wdata;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       tcm_dmem_rdata;
 type_scr1_mem_resp_e                                tcm_dmem_resp;
 `endif // SCR1_TCM_EN
