@@ -136,6 +136,8 @@ set files [list \
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_mem_axi.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_timer.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/top/scr1_top_axi.sv"]"\
+ "[file normalize "$origin_dir/src/cache/scr1_icache.sv"]"\
+ "[file normalize "$origin_dir/src/cache/scr1_dcache.sv"]"\
  "[file normalize "$origin_dir/src/cache/scr1_cache_wrapper.sv"]"\
  "[file normalize "$origin_dir/src/nexys4ddr_scr1.sv"]"\
 ]
@@ -327,6 +329,21 @@ set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
+set file "$origin_dir/src/cache/scr1_icache.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/src/cache/scr1_dcache.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/src/cache/scr1_cache_wrapper.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
 set file "$origin_dir/src/nexys4ddr_scr1.sv"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
@@ -402,7 +419,15 @@ if {[string equal [get_filesets -quiet sim_1] ""]} {
 
 # Set 'sim_1' fileset object
 set obj [get_filesets sim_1]
-# Empty (no sources present)
+set files [list \
+ "[file normalize "$origin_dir/tb/cache/scr1_cache_blocks_tb.sv"]"\
+]
+add_files -norecurse -fileset $obj $files
+
+set file "$origin_dir/tb/cache/scr1_cache_blocks_tb.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 # Set 'sim_1' fileset properties
 set obj [get_filesets sim_1]
