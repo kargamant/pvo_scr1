@@ -165,7 +165,7 @@ logic                                               axi_rst_n;
 logic                                               tapc_trst_n;
 `endif // SCR1_DBG_EN
 
-// Instruction memory interface from core to router
+// Instruction memory interface from core to cache
 logic                                               core_imem_req_ack;
 logic                                               core_imem_req;
 type_scr1_mem_cmd_e                                 core_imem_cmd;
@@ -173,7 +173,7 @@ logic [`SCR1_IMEM_AWIDTH-1:0]                       core_imem_addr;
 logic [`SCR1_IMEM_DWIDTH-1:0]                       core_imem_rdata;
 type_scr1_mem_resp_e                                core_imem_resp;
 
-// Data memory interface from core to router
+// Data memory interface from core to cache
 logic                                               core_dmem_req_ack;
 logic                                               core_dmem_req;
 type_scr1_mem_cmd_e                                 core_dmem_cmd;
@@ -182,6 +182,24 @@ logic [`SCR1_DMEM_AWIDTH-1:0]                       core_dmem_addr;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_wdata;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
+
+// Instruction memory interface from cache to router
+logic                                               cache_imem_req_ack;
+logic                                               cache_imem_req;
+type_scr1_mem_cmd_e                                 cache_imem_cmd;
+logic [`SCR1_IMEM_AWIDTH-1:0]                       cache_imem_addr;
+logic [`SCR1_IMEM_DWIDTH-1:0]                       cache_imem_rdata;
+type_scr1_mem_resp_e                                cache_imem_resp;
+
+// Data memory interface from cache to router
+logic                                               cache_dmem_req_ack;
+logic                                               cache_dmem_req;
+type_scr1_mem_cmd_e                                 cache_dmem_cmd;
+type_scr1_mem_width_e                               cache_dmem_width;
+logic [`SCR1_DMEM_AWIDTH-1:0]                       cache_dmem_addr;
+logic [`SCR1_DMEM_DWIDTH-1:0]                       cache_dmem_wdata;
+logic [`SCR1_DMEM_DWIDTH-1:0]                       cache_dmem_rdata;
+type_scr1_mem_resp_e                                cache_dmem_resp;
 
 // Instruction memory interface from router to AXI bridge
 logic                                               axi_imem_req_ack;
@@ -359,6 +377,65 @@ scr1_core_top i_core_top (
 );
 
 
+//-------------------------------------------------------------------------------
+// Instruction and data cache wrapper
+//-------------------------------------------------------------------------------
+scr1_cache_wrapper #(
+    // Cache only the 128 MiB DDR2 window: 0x0000_0000 - 0x07FF_FFFF.
+    // TCM, timer, BRAM and external MMIO therefore use the uncached path.
+    .ICACHE_ADDR_MASK     ('0),
+    .ICACHE_ADDR_PATTERN  ('0),
+    .DCACHE_ADDR_MASK     ('0),
+    .DCACHE_ADDR_PATTERN  ('0)
+) i_cache_wrapper (
+    .clk                     (clk                 ),
+    .rst_n                   (core_rst_n_local    ),
+
+    // Runtime maintenance is not exposed by scr1_core_top yet.  Both caches
+    // are invalidated by reset; connect these inputs when FENCE.I/flush
+    // control is added to the core integration.
+    .icache_invalidate_i     (1'b0                ),
+    .icache_invalidate_ack_o (                    ),
+    .dcache_flush_i          (1'b0                ),
+    .dcache_flush_ack_o      (                    ),
+
+    // Interface to SCR1 core
+    .imem2core_req_ack_o     (core_imem_req_ack   ),
+    .core2imem_req_i         (core_imem_req       ),
+    .core2imem_cmd_i         (core_imem_cmd       ),
+    .core2imem_addr_i        (core_imem_addr      ),
+    .imem2core_rdata_o       (core_imem_rdata     ),
+    .imem2core_resp_o        (core_imem_resp      ),
+
+    .dmem2core_req_ack_o     (core_dmem_req_ack   ),
+    .core2dmem_req_i         (core_dmem_req       ),
+    .core2dmem_cmd_i         (core_dmem_cmd       ),
+    .core2dmem_width_i       (core_dmem_width     ),
+    .core2dmem_addr_i        (core_dmem_addr      ),
+    .core2dmem_wdata_i       (core_dmem_wdata     ),
+    .dmem2core_rdata_o       (core_dmem_rdata     ),
+    .dmem2core_resp_o        (core_dmem_resp      ),
+
+    // Interface to instruction memory router
+    .mem2icache_req_ack_i    (cache_imem_req_ack  ),
+    .icache2mem_req_o        (cache_imem_req      ),
+    .icache2mem_cmd_o        (cache_imem_cmd      ),
+    .icache2mem_addr_o       (cache_imem_addr     ),
+    .mem2icache_rdata_i      (cache_imem_rdata    ),
+    .mem2icache_resp_i       (cache_imem_resp     ),
+
+    // Interface to data memory router
+    .mem2dcache_req_ack_i    (cache_dmem_req_ack  ),
+    .dcache2mem_req_o        (cache_dmem_req      ),
+    .dcache2mem_cmd_o        (cache_dmem_cmd      ),
+    .dcache2mem_width_o      (cache_dmem_width    ),
+    .dcache2mem_addr_o       (cache_dmem_addr     ),
+    .dcache2mem_wdata_o      (cache_dmem_wdata    ),
+    .mem2dcache_rdata_i      (cache_dmem_rdata    ),
+    .mem2dcache_resp_i       (cache_dmem_resp     )
+);
+
+
 `ifdef SCR1_TCM_EN
 //-------------------------------------------------------------------------------
 // TCM instance
@@ -425,13 +502,13 @@ scr1_imem_router #(
     .rst_n          (core_rst_n_local ),
     .clk            (clk              ),
 
-    // Interface to core
-    .imem_req_ack   (core_imem_req_ack),
-    .imem_req       (core_imem_req    ),
-    .imem_cmd       (core_imem_cmd    ),
-    .imem_addr      (core_imem_addr   ),
-    .imem_rdata     (core_imem_rdata  ),
-    .imem_resp      (core_imem_resp   ),
+    // Interface to instruction cache
+    .imem_req_ack   (cache_imem_req_ack),
+    .imem_req       (cache_imem_req    ),
+    .imem_cmd       (cache_imem_cmd    ),
+    .imem_addr      (cache_imem_addr   ),
+    .imem_rdata     (cache_imem_rdata  ),
+    .imem_resp      (cache_imem_resp   ),
 
     // Interface to AXI bridge
     .port0_req_ack  (axi_imem_req_ack ),
@@ -452,12 +529,12 @@ scr1_imem_router #(
 
 `else // SCR1_IMEM_ROUTER_EN
 
-assign axi_imem_req         = core_imem_req;
-assign axi_imem_cmd         = core_imem_cmd;
-assign axi_imem_addr        = core_imem_addr;
-assign core_imem_req_ack    = axi_imem_req_ack;
-assign core_imem_resp       = axi_imem_resp;
-assign core_imem_rdata      = axi_imem_rdata;
+assign axi_imem_req          = cache_imem_req;
+assign axi_imem_cmd          = cache_imem_cmd;
+assign axi_imem_addr         = cache_imem_addr;
+assign cache_imem_req_ack    = axi_imem_req_ack;
+assign cache_imem_resp       = axi_imem_resp;
+assign cache_imem_rdata      = axi_imem_rdata;
 
 `endif // SCR1_IMEM_ROUTER_EN
 
@@ -482,15 +559,15 @@ scr1_dmem_router #(
     .rst_n          (core_rst_n_local    ),
     .clk            (clk                 ),
 
-    // Interface to core
-    .dmem_req_ack   (core_dmem_req_ack   ),
-    .dmem_req       (core_dmem_req       ),
-    .dmem_cmd       (core_dmem_cmd       ),
-    .dmem_width     (core_dmem_width     ),
-    .dmem_addr      (core_dmem_addr      ),
-    .dmem_wdata     (core_dmem_wdata     ),
-    .dmem_rdata     (core_dmem_rdata     ),
-    .dmem_resp      (core_dmem_resp      ),
+    // Interface to data cache
+    .dmem_req_ack   (cache_dmem_req_ack  ),
+    .dmem_req       (cache_dmem_req      ),
+    .dmem_cmd       (cache_dmem_cmd      ),
+    .dmem_width     (cache_dmem_width    ),
+    .dmem_addr      (cache_dmem_addr     ),
+    .dmem_wdata     (cache_dmem_wdata    ),
+    .dmem_rdata     (cache_dmem_rdata    ),
+    .dmem_resp      (cache_dmem_resp     ),
 
 `ifdef SCR1_TCM_EN
     // Interface to TCM
