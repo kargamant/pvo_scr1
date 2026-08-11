@@ -38,6 +38,8 @@ module scr1_dcache #(
     localparam int unsigned WORD_INDEX_BITS  = $clog2(LINE_WORDS);
     localparam int unsigned LINE_OFFSET_BITS = BYTE_OFFSET_BITS + WORD_INDEX_BITS;
     localparam int unsigned LINE_INDEX_BITS  = $clog2(NUM_LINES);
+    localparam int unsigned CACHE_WORDS      = NUM_LINES * LINE_WORDS;
+    localparam int unsigned CACHE_ADDR_BITS  = $clog2(CACHE_WORDS);
     localparam int unsigned TAG_BITS         = `SCR1_DMEM_AWIDTH
                                                - LINE_OFFSET_BITS
                                                - LINE_INDEX_BITS;
@@ -58,7 +60,8 @@ module scr1_dcache #(
     dcache_state_e state_q;
     dcache_state_e state_d;
 
-    logic [`SCR1_DMEM_DWIDTH-1:0] data_mem [0:NUM_LINES-1][0:LINE_WORDS-1];
+    (* ram_style = "block" *)
+    logic [`SCR1_DMEM_DWIDTH-1:0] data_mem [0:CACHE_WORDS-1];
     logic [TAG_BITS-1:0]          tag_mem  [0:NUM_LINES-1];
     logic [NUM_LINES-1:0]         valid_q;
 
@@ -71,6 +74,14 @@ module scr1_dcache #(
 
     logic [LINE_INDEX_BITS-1:0]   req_line_index;
     logic [WORD_INDEX_BITS-1:0]   req_word_index;
+    logic [CACHE_ADDR_BITS-1:0]   cpu_data_index;
+    logic [CACHE_ADDR_BITS-1:0]   req_data_index;
+    logic [CACHE_ADDR_BITS-1:0]   fill_data_index;
+    logic [`SCR1_DMEM_DWIDTH-1:0] data_mem_rdata_q;
+    logic                         data_mem_write_en;
+    logic [3:0]                   data_mem_write_byte_en;
+    logic [CACHE_ADDR_BITS-1:0]   data_mem_write_addr;
+    logic [`SCR1_DMEM_DWIDTH-1:0] data_mem_write_data;
     logic [TAG_BITS-1:0]          req_tag;
     logic                         req_cacheable;
     logic                         req_hit;
@@ -83,25 +94,6 @@ module scr1_dcache #(
         input logic [1:0]                   byte_offset
     );
         select_load_data = word_data >> (8 * byte_offset);
-    endfunction
-
-    function automatic logic [`SCR1_DMEM_DWIDTH-1:0] merge_store_data (
-        input logic [`SCR1_DMEM_DWIDTH-1:0] old_word,
-        input logic [`SCR1_DMEM_DWIDTH-1:0] store_data,
-        input type_scr1_mem_width_e         store_width,
-        input logic [1:0]                   byte_offset
-    );
-        logic [`SCR1_DMEM_DWIDTH-1:0] byte_mask;
-        logic [`SCR1_DMEM_DWIDTH-1:0] shifted_data;
-        begin
-            unique case (store_width)
-                SCR1_MEM_WIDTH_BYTE:  byte_mask = 32'h000000ff << (8 * byte_offset);
-                SCR1_MEM_WIDTH_HWORD: byte_mask = 32'h0000ffff << (8 * byte_offset);
-                default:              byte_mask = 32'hffffffff;
-            endcase
-            shifted_data     = store_data << (8 * byte_offset);
-            merge_store_data = (old_word & ~byte_mask) | (shifted_data & byte_mask);
-        end
     endfunction
 
     initial begin
@@ -118,6 +110,12 @@ module scr1_dcache #(
 
     assign req_word_index = req_addr_q[BYTE_OFFSET_BITS +: WORD_INDEX_BITS];
     assign req_line_index = req_addr_q[LINE_OFFSET_BITS +: LINE_INDEX_BITS];
+    assign cpu_data_index = {
+        cpu_addr_i[LINE_OFFSET_BITS +: LINE_INDEX_BITS],
+        cpu_addr_i[BYTE_OFFSET_BITS +: WORD_INDEX_BITS]
+    };
+    assign req_data_index = {req_line_index, req_word_index};
+    assign fill_data_index = {req_line_index, fill_word_q};
     assign req_tag        = req_addr_q[`SCR1_DMEM_AWIDTH-1 -: TAG_BITS];
 
     assign req_cacheable = (req_addr_q & CACHEABLE_ADDR_MASK)
@@ -129,6 +127,45 @@ module scr1_dcache #(
         fill_addr = req_addr_q;
         fill_addr[LINE_OFFSET_BITS-1:0] = '0;
         fill_addr[BYTE_OFFSET_BITS +: WORD_INDEX_BITS] = fill_word_q;
+    end
+
+    // Both cache-line fills and write-through updates share one physical RAM
+    // write port. Byte enables let stores update only the addressed byte lanes
+    // without reading and merging the old RAM word.
+    always_comb begin
+        data_mem_write_en      = 1'b0;
+        data_mem_write_byte_en = 4'b0000;
+        data_mem_write_addr    = '0;
+        data_mem_write_data    = '0;
+
+        if ((state_q == DC_FILL_WAIT)
+            && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
+            data_mem_write_en      = 1'b1;
+            data_mem_write_byte_en = 4'b1111;
+            data_mem_write_addr    = fill_data_index;
+            data_mem_write_data    = mem_rdata_i;
+        end else if ((state_q == DC_BYPASS_WAIT)
+            && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)
+            && (req_cmd_q != SCR1_MEM_CMD_RD)
+            && req_cacheable && req_hit) begin
+            data_mem_write_en   = 1'b1;
+            data_mem_write_addr = req_data_index;
+            data_mem_write_data = req_wdata_q << (8 * req_addr_q[1:0]);
+
+            unique case (req_width_q)
+                SCR1_MEM_WIDTH_BYTE: begin
+                    data_mem_write_byte_en = 4'b0001 << req_addr_q[1:0];
+                end
+
+                SCR1_MEM_WIDTH_HWORD: begin
+                    data_mem_write_byte_en = 4'b0011 << req_addr_q[1:0];
+                end
+
+                default: begin
+                    data_mem_write_byte_en = 4'b1111;
+                end
+            endcase
+        end
     end
 
     always_comb begin
@@ -248,6 +285,30 @@ module scr1_dcache #(
         end
     end
 
+    // Cache memories have no reset. Their contents are ignored whenever the
+    // corresponding valid bit is clear. Keeping all memory accesses in this
+    // clock-only process matches the synchronous RAM inference template.
+    always_ff @(posedge clk) begin
+        if ((state_q == DC_IDLE) && cpu_req_i && cpu_req_ack_o) begin
+            data_mem_rdata_q <= data_mem[cpu_data_index];
+        end
+
+        if (data_mem_write_en) begin
+            for (int byte_num = 0; byte_num < 4; byte_num++) begin
+                if (data_mem_write_byte_en[byte_num]) begin
+                    data_mem[data_mem_write_addr][byte_num*8 +: 8]
+                        <= data_mem_write_data[byte_num*8 +: 8];
+                end
+            end
+        end
+
+        if ((state_q == DC_FILL_WAIT)
+            && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)
+            && (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1))) begin
+            tag_mem[req_line_index] <= req_tag;
+        end
+    end
+
     always_ff @(posedge clk, negedge rst_n) begin
         if (!rst_n) begin
             state_q         <= DC_IDLE;
@@ -277,20 +338,17 @@ module scr1_dcache #(
             if ((state_q == DC_LOOKUP) && (req_cmd_q == SCR1_MEM_CMD_RD)
                 && req_cacheable && req_hit) begin
                 response_data_q <= select_load_data(
-                    data_mem[req_line_index][req_word_index], req_addr_q[1:0]
+                    data_mem_rdata_q, req_addr_q[1:0]
                 );
             end
 
             if ((state_q == DC_FILL_WAIT)
                 && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
-                data_mem[req_line_index][fill_word_q] <= mem_rdata_i;
-
                 if (fill_word_q == req_word_index) begin
                     response_data_q <= select_load_data(mem_rdata_i, req_addr_q[1:0]);
                 end
 
                 if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
-                    tag_mem[req_line_index] <= req_tag;
                     valid_q[req_line_index] <= 1'b1;
                 end else begin
                     fill_word_q <= fill_word_q + 1'b1;
@@ -303,16 +361,6 @@ module scr1_dcache #(
                     // The SCR1 lower-memory bridge already right-aligns
                     // byte/halfword reads, so bypass data needs no shift.
                     response_data_q <= mem_rdata_i;
-                end else if (req_cacheable && req_hit) begin
-                    // Write-through: update the cached copy only after the
-                    // lower memory confirms the store.
-                    data_mem[req_line_index][req_word_index]
-                        <= merge_store_data(
-                            data_mem[req_line_index][req_word_index],
-                            req_wdata_q,
-                            req_width_q,
-                            req_addr_q[1:0]
-                        );
                 end
             end
 

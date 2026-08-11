@@ -4,8 +4,10 @@
 `include "scr1_memif.svh"
 
 module scr1_icache #(
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_ADDR_MASK    = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_ADDR_PATTERN = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_BRAM_ADDR_MASK    = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_BRAM_ADDR_PATTERN = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_MASK    = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_PATTERN = '0,
     parameter int unsigned                  NUM_LINES              = 64,
     parameter int unsigned                  LINE_WORDS             = 4
 ) (
@@ -34,6 +36,8 @@ module scr1_icache #(
     localparam int unsigned WORD_INDEX_BITS  = $clog2(LINE_WORDS);
     localparam int unsigned LINE_OFFSET_BITS = BYTE_OFFSET_BITS + WORD_INDEX_BITS;
     localparam int unsigned LINE_INDEX_BITS  = $clog2(NUM_LINES);
+    localparam int unsigned CACHE_WORDS      = NUM_LINES * LINE_WORDS;
+    localparam int unsigned CACHE_ADDR_BITS  = $clog2(CACHE_WORDS);
     localparam int unsigned TAG_BITS         = `SCR1_IMEM_AWIDTH
                                                - LINE_OFFSET_BITS
                                                - LINE_INDEX_BITS;
@@ -54,7 +58,8 @@ module scr1_icache #(
     icache_state_e state_q;
     icache_state_e state_d;
 
-    logic [`SCR1_IMEM_DWIDTH-1:0] data_mem [0:NUM_LINES-1][0:LINE_WORDS-1];
+    (* ram_style = "block" *)
+    logic [`SCR1_IMEM_DWIDTH-1:0] data_mem [0:CACHE_WORDS-1];
     logic [TAG_BITS-1:0]          tag_mem  [0:NUM_LINES-1];
     logic [NUM_LINES-1:0]         valid_q;
 
@@ -65,6 +70,10 @@ module scr1_icache #(
 
     logic [LINE_INDEX_BITS-1:0]   req_line_index;
     logic [WORD_INDEX_BITS-1:0]   req_word_index;
+    logic [CACHE_ADDR_BITS-1:0]   cpu_data_index;
+    logic [CACHE_ADDR_BITS-1:0]   req_data_index;
+    logic [CACHE_ADDR_BITS-1:0]   fill_data_index;
+    logic [`SCR1_IMEM_DWIDTH-1:0] data_mem_rdata_q;
     logic [TAG_BITS-1:0]          req_tag;
     logic                         req_cacheable;
     logic                         req_hit;
@@ -86,10 +95,16 @@ module scr1_icache #(
 
     assign req_word_index = req_addr_q[BYTE_OFFSET_BITS +: WORD_INDEX_BITS];
     assign req_line_index = req_addr_q[LINE_OFFSET_BITS +: LINE_INDEX_BITS];
+    assign cpu_data_index = {
+        cpu_addr_i[LINE_OFFSET_BITS +: LINE_INDEX_BITS],
+        cpu_addr_i[BYTE_OFFSET_BITS +: WORD_INDEX_BITS]
+    };
+    assign req_data_index = {req_line_index, req_word_index};
+    assign fill_data_index = {req_line_index, fill_word_q};
     assign req_tag        = req_addr_q[`SCR1_IMEM_AWIDTH-1 -: TAG_BITS];
 
-    assign req_cacheable = (req_addr_q & CACHEABLE_ADDR_MASK)
-                         == (CACHEABLE_ADDR_PATTERN & CACHEABLE_ADDR_MASK);
+    assign req_cacheable = ((req_addr_q & CACHEABLE_BRAM_ADDR_MASK) == CACHEABLE_BRAM_ADDR_PATTERN) ||
+                            ((req_addr_q & CACHEABLE_DDR_ADDR_MASK) == CACHEABLE_DDR_ADDR_PATTERN);
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
 
@@ -209,6 +224,24 @@ module scr1_icache #(
         end
     end
 
+    // Cache memories have no reset. Their contents are ignored whenever the
+    // corresponding valid bit is clear. Keeping all memory accesses in this
+    // clock-only process matches the synchronous RAM inference template.
+    always_ff @(posedge clk) begin
+        if ((state_q == IC_IDLE) && cpu_req_i && cpu_req_ack_o) begin
+            data_mem_rdata_q <= data_mem[cpu_data_index];
+        end
+
+        if ((state_q == IC_FILL_WAIT)
+            && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
+            data_mem[fill_data_index] <= mem_rdata_i;
+
+            if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                tag_mem[req_line_index] <= req_tag;
+            end
+        end
+    end
+
     always_ff @(posedge clk, negedge rst_n) begin
         if (!rst_n) begin
             state_q        <= IC_IDLE;
@@ -232,19 +265,16 @@ module scr1_icache #(
 
             if ((state_q == IC_LOOKUP) && req_cacheable && req_hit
                 && (req_cmd_q == SCR1_MEM_CMD_RD)) begin
-                response_data_q <= data_mem[req_line_index][req_word_index];
+                response_data_q <= data_mem_rdata_q;
             end
 
             if ((state_q == IC_FILL_WAIT)
                 && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
-                data_mem[req_line_index][fill_word_q] <= mem_rdata_i;
-
                 if (fill_word_q == req_word_index) begin
                     response_data_q <= mem_rdata_i;
                 end
 
                 if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
-                    tag_mem[req_line_index]   <= req_tag;
                     valid_q[req_line_index]   <= 1'b1;
                 end else begin
                     fill_word_q <= fill_word_q + 1'b1;
