@@ -76,6 +76,7 @@ module scr1_icache #(
     logic [`SCR1_IMEM_DWIDTH-1:0] data_mem_rdata_q;
     logic [TAG_BITS-1:0]          req_tag;
     logic                         req_cacheable;
+    logic                         cpu_addr_cacheable;
     logic                         req_hit;
     logic [`SCR1_IMEM_AWIDTH-1:0] fill_addr;
 
@@ -105,6 +106,8 @@ module scr1_icache #(
 
     assign req_cacheable = ((req_addr_q & CACHEABLE_BRAM_ADDR_MASK) == CACHEABLE_BRAM_ADDR_PATTERN) ||
                             ((req_addr_q & CACHEABLE_DDR_ADDR_MASK) == CACHEABLE_DDR_ADDR_PATTERN);
+    assign cpu_addr_cacheable = ((cpu_addr_i & CACHEABLE_BRAM_ADDR_MASK) == CACHEABLE_BRAM_ADDR_PATTERN) ||
+                            ((cpu_addr_i & CACHEABLE_DDR_ADDR_MASK) == CACHEABLE_DDR_ADDR_PATTERN);
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
 
@@ -122,7 +125,13 @@ module scr1_icache #(
                 if (invalidate_i) begin
                     state_d = IC_INVALIDATE;
                 end else if (cpu_req_i) begin
-                    state_d = IC_LOOKUP;
+                    if (!cpu_addr_cacheable) begin
+                        if (mem_req_ack_i) begin
+                            state_d = IC_BYPASS_WAIT;
+                        end
+                    end else begin
+                        state_d = IC_LOOKUP;
+                    end
                 end
             end
 
@@ -163,10 +172,9 @@ module scr1_icache #(
             end
 
             IC_BYPASS_WAIT: begin
-                if (mem_resp_i == SCR1_MEM_RESP_RDY_ER) begin
-                    state_d = IC_RESP_ERR;
-                end else if (mem_resp_i == SCR1_MEM_RESP_RDY_OK) begin
-                    state_d = IC_RESP_OK;
+                if ((mem_resp_i == SCR1_MEM_RESP_RDY_ER)
+                    || (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
+                    state_d = IC_IDLE;
                 end
             end
 
@@ -202,7 +210,16 @@ module scr1_icache #(
         mem_addr_o          = '0;
 
         if ((state_q == IC_IDLE) && !invalidate_i) begin
-            cpu_req_ack_o = 1'b1;
+            if (cpu_req_i) begin
+                if (!cpu_addr_cacheable) begin
+                    mem_req_o  = 1'b1;
+                    mem_cmd_o = cpu_cmd_i;
+                    mem_addr_o = cpu_addr_i;
+                    cpu_req_ack_o = mem_req_ack_i;
+                end else begin
+                    cpu_req_ack_o = 1'b1;
+                end
+            end
         end
 
         if (state_q == IC_FILL_REQ) begin
@@ -213,6 +230,10 @@ module scr1_icache #(
             mem_addr_o = req_addr_q;
         end
 
+        if (state_q == IC_BYPASS_WAIT) begin
+            cpu_resp_o  = mem_resp_i;
+            cpu_rdata_o = mem_rdata_i;
+        end
         if (state_q == IC_RESP_OK) begin
             cpu_resp_o = SCR1_MEM_RESP_RDY_OK;
         end else if (state_q == IC_RESP_ERR) begin
@@ -279,11 +300,6 @@ module scr1_icache #(
                 end else begin
                     fill_word_q <= fill_word_q + 1'b1;
                 end
-            end
-
-            if ((state_q == IC_BYPASS_WAIT)
-                && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
-                response_data_q <= mem_rdata_i;
             end
 
             if (state_q == IC_INVALIDATE) begin

@@ -84,6 +84,7 @@ module scr1_dcache #(
     logic [`SCR1_DMEM_DWIDTH-1:0] data_mem_write_data;
     logic [TAG_BITS-1:0]          req_tag;
     logic                         req_cacheable;
+    logic                         cpu_addr_cacheable;
     logic                         req_hit;
     logic [`SCR1_DMEM_AWIDTH-1:0] fill_addr;
 
@@ -120,6 +121,8 @@ module scr1_dcache #(
 
     assign req_cacheable = (req_addr_q & CACHEABLE_ADDR_MASK)
                          == (CACHEABLE_ADDR_PATTERN & CACHEABLE_ADDR_MASK);
+    assign cpu_addr_cacheable = (cpu_addr_i & CACHEABLE_ADDR_MASK)
+                              == (CACHEABLE_ADDR_PATTERN & CACHEABLE_ADDR_MASK);
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
 
@@ -176,7 +179,13 @@ module scr1_dcache #(
                 if (flush_i) begin
                     state_d = DC_FLUSH;
                 end else if (cpu_req_i) begin
-                    state_d = DC_LOOKUP;
+                    if (!cpu_addr_cacheable) begin
+                        if (mem_req_ack_i) begin
+                            state_d = DC_BYPASS_WAIT;
+                        end
+                    end else begin
+                        state_d = DC_LOOKUP;
+                    end
                 end
             end
 
@@ -217,10 +226,9 @@ module scr1_dcache #(
             end
 
             DC_BYPASS_WAIT: begin
-                if (mem_resp_i == SCR1_MEM_RESP_RDY_ER) begin
-                    state_d = DC_RESP_ERR;
-                end else if (mem_resp_i == SCR1_MEM_RESP_RDY_OK) begin
-                    state_d = DC_RESP_OK;
+                if ((mem_resp_i == SCR1_MEM_RESP_RDY_ER)
+                    || (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
+                    state_d = DC_IDLE;
                 end
             end
 
@@ -258,7 +266,18 @@ module scr1_dcache #(
         mem_wdata_o   = '0;
 
         if ((state_q == DC_IDLE) && !flush_i) begin
-            cpu_req_ack_o = 1'b1;
+            if (cpu_req_i) begin
+                if (!cpu_addr_cacheable) begin
+                    mem_req_o     = 1'b1;
+                    mem_cmd_o     = cpu_cmd_i;
+                    mem_width_o   = cpu_width_i;
+                    mem_addr_o    = cpu_addr_i;
+                    mem_wdata_o   = cpu_wdata_i;
+                    cpu_req_ack_o = mem_req_ack_i;
+                end else begin
+                    cpu_req_ack_o = 1'b1;
+                end
+            end
         end
 
         if (state_q == DC_FILL_REQ) begin
@@ -272,6 +291,11 @@ module scr1_dcache #(
             mem_width_o = req_width_q;
             mem_addr_o  = req_addr_q;
             mem_wdata_o = req_wdata_q;
+        end
+
+        if (state_q == DC_BYPASS_WAIT) begin
+            cpu_resp_o  = mem_resp_i;
+            cpu_rdata_o = mem_rdata_i;
         end
 
         if (state_q == DC_RESP_OK) begin
@@ -352,15 +376,6 @@ module scr1_dcache #(
                     valid_q[req_line_index] <= 1'b1;
                 end else begin
                     fill_word_q <= fill_word_q + 1'b1;
-                end
-            end
-
-            if ((state_q == DC_BYPASS_WAIT)
-                && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
-                if (req_cmd_q == SCR1_MEM_CMD_RD) begin
-                    // The SCR1 lower-memory bridge already right-aligns
-                    // byte/halfword reads, so bypass data needs no shift.
-                    response_data_q <= mem_rdata_i;
                 end
             end
 
