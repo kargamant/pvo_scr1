@@ -155,22 +155,25 @@ parameter int unsigned SCR1_TDU_TRIG_NUM = 2;   // number of hardware triggers
 // CORE INTEGRATION OPTIONS
 //------------------------------------------------------------------------------
 
-// Static branch predictor (BTFN, milestone M1: JAL only).
-// When commented out, the core is bit-identical to the original (no prediction).
+// Static branch predictor (BTFN). Requires nothing.
 `define SCR1_BPRED_EN
 
 // Return Address Stack: predict `ret` (JALR) targets. Requires SCR1_BPRED_EN.
-// When commented out -> returns behave as before (always redirect in EXU).
 `define SCR1_BP_RAS_EN
-parameter int unsigned SCR1_RAS_DEPTH = 4;   // RAS depth (call nesting covered)
+parameter int unsigned SCR1_RAS_DEPTH = 4;   // RAS depth
 
-// Dynamic branch predictor (BHT direction prediction). Requires SCR1_BPRED_EN.
-// D0 (scaffolding): carries the prediction bit + BHT index down IFU->EXU and
-// opens an EXU->IFU training channel. No behavioural change while commented out,
-// and even when enabled at D0 the EXU still uses the static mirror (D1 flips it).
+// Dynamic branch predictor (BHT direction). Requires SCR1_BPRED_EN.
 `define SCR1_BP_DYNAMIC
-parameter int unsigned SCR1_BP_BHT_SIZE  = 1024;                     // BHT entries (2-bit saturating counters), used from D1
+parameter int unsigned SCR1_BP_BHT_SIZE  = 1024;                     // BHT entries (2-bit saturating counters)
 parameter int unsigned SCR1_BP_BHT_IDX_W = $clog2(SCR1_BP_BHT_SIZE); // BHT index width
+
+// Early Branch Target Buffer (fetch-PC-indexed target cache). Requires SCR1_BPRED_EN.
+`define SCR1_BP_BTB
+parameter int unsigned SCR1_BP_BTB_SIZE  = 256;                      // BTB entries (directly-mapped)
+parameter int unsigned SCR1_BP_BTB_IDX_W = $clog2(SCR1_BP_BTB_SIZE); // BTB index width
+
+// IFU fetch-queue depth in 32-bit words
+parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 2;
 
 // Bypasses on AXI/AHB bridge I/O
 `define SCR1_IMEM_AHB_IN_BP         // bypass instruction memory AHB bridge input register

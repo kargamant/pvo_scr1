@@ -161,20 +161,29 @@ module scr1_pipe_exu (
     output  logic [`SCR1_XLEN-1:0]              exu2ifu_pc_new_o            // New PC data
 `ifdef SCR1_BP_RAS_EN
     ,
-    // IFU -> EXU RAS prediction for the current instruction (return target)
+    // IFU -> EXU RAS prediction
     input   logic                               ifu2exu_bp_ras_vd_i,        // predicted return
     input   logic [`SCR1_XLEN-1:0]              ifu2exu_bp_ras_target_i     // predicted return target
 `endif // SCR1_BP_RAS_EN
 `ifdef SCR1_BP_DYNAMIC
     ,
-    // IFU -> EXU: dynamic-predictor metadata for the current instruction (D0)
+    // IFU -> EXU: dynamic-predictor metadata
     input   logic                               ifu2exu_bp_predicted_taken_i,
     input   logic [SCR1_BP_BHT_IDX_W-1:0]       ifu2exu_bp_index_i,
-    // EXU -> IFU: BHT training channel (D0: driven, consumed by IFU from D1)
+    // EXU -> IFU: BHT training channel
     output  logic                               exu2ifu_bp_upd_vd_o,
     output  logic [SCR1_BP_BHT_IDX_W-1:0]       exu2ifu_bp_upd_index_o,
     output  logic                               exu2ifu_bp_upd_taken_o
 `endif // SCR1_BP_DYNAMIC
+`ifdef SCR1_BP_BTB
+    ,
+    // EXU -> IFU: early-BTB training channel (resolved taken direct branch/jump)
+    output  logic                               exu2ifu_bp_btb_upd_vd_o,
+    output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_btb_upd_pc_o,
+    output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_btb_upd_target_o,
+    output  logic                               exu2ifu_bp_btb_upd_safe_o,
+    output  logic                               exu2ifu_bp_btb_upd_is_cond_o
+`endif // SCR1_BP_BTB
 );
 
 //------------------------------------------------------------------------------
@@ -273,8 +282,8 @@ logic                               jb_misalign;
 `endif
 
 // Static branch predictor signals - mirror of scr1_pipe_bpred in the IFU
-logic                               bp_taken;           // predictor: this instr was predicted taken (static mirror)
-logic                               bp_dir_pred;        // predicted direction used for mispredict (static mirror or dynamic carried)
+logic                               bp_taken;           // predicted taken
+logic                               bp_dir_pred;        // predicted direction for mispredict
 logic                               bp_mispredict;      // prediction != actual outcome
 logic                               bp_recover_seq;     // predicted taken, resolved not-taken
 logic                               pc_curr_transfer;   // architectural control transfer this cycle
@@ -291,7 +300,7 @@ logic [`SCR1_XLEN-1:0]              bp_ras_target_ff;
 `endif // SCR1_BP_RAS_EN
 
 `ifdef SCR1_BP_DYNAMIC
-// Dynamic predictor: carried prediction bit + BHT index (D0 scaffolding)
+// Dynamic predictor: carried prediction bit + BHT index
 logic                               exu_bp_predicted_taken; // predicted direction for this instr
 logic [SCR1_BP_BHT_IDX_W-1:0]       exu_bp_index;           // BHT index used at fetch
 `ifndef SCR1_NO_EXE_STAGE
@@ -772,9 +781,7 @@ always_comb begin
     endcase
 end
 
-// Architectural control transfer this cycle. Drives the PC register and the
-// tracelog. Includes every taken jump/branch, independent of whether the fetch
-// was already redirected early by the branch predictor.
+// Architectural control transfer this cycle
 assign pc_curr_transfer     = init_pc                                        // reset
                             | exu2csr_take_irq_o
                             | exu2csr_take_exc_o
@@ -790,9 +797,7 @@ assign pc_curr_transfer     = init_pc                                        // 
 `endif // SCR1_DBG_EN
                             | (exu_queue_vd & jb_taken);
 
-// Fetch-redirect request to the IFU. Same events as the architectural transfer,
-// but for jumps/branches only when the static predictor mispredicted (a
-// correctly predicted taken jump/branch needs no flush - that is the M1 win).
+// Fetch-redirect request to the IFU (jumps/branches only on mispredict)
 assign exu2ifu_pc_new_req_o = init_pc                                        // reset
                             | exu2csr_take_irq_o
                             | exu2csr_take_exc_o
@@ -813,20 +818,15 @@ assign branch_taken = exu_queue.branch_req & ialu_cmp;
 assign jb_taken     = exu_queue.jump_req | branch_taken;
 assign jb_new_pc    = ialu_addr_res & SCR1_JUMP_MASK;
 
-// Static predictor mirror (full: M1 JAL + M2 branches + M3 RVC). Must match
-// scr1_pipe_bpred in the IFU exactly, so mispredict recovery redirects correctly.
-//   direct jumps (JAL, c.j, c.jal) : jump_req & sum2_op==PC_IMM -> always taken
-//   backward branches (bXX, c.beqz/c.bnez) : branch_req & imm[31] (negative offset)
-//   JALR (indirect, sum2_op==REG_IMM)      : not predicted -> mispredict->redirect
+// Static predictor mirror (must match scr1_pipe_bpred in the IFU)
 `ifdef SCR1_BPRED_EN
 assign bp_taken       = (exu_queue.jump_req   & (exu_queue.sum2_op == SCR1_SUM2_OP_PC_IMM))
                       | (exu_queue.branch_req &  exu_queue.imm[`SCR1_XLEN-1]);
 `else // SCR1_BPRED_EN
-assign bp_taken       = 1'b0;    // predictor disabled -> mispredict==jb_taken (original)
+assign bp_taken       = 1'b0;    // predictor disabled
 `endif // SCR1_BPRED_EN
 
-// Predicted direction fed to mispredict detection: dynamic (D1) uses the bit
-// carried from the IFU BHT read; static uses the EXU mirror recomputed here.
+// Predicted direction for mispredict detection (dynamic carried, or static mirror)
 `ifdef SCR1_BP_DYNAMIC
 assign bp_dir_pred = exu_bp_predicted_taken;
 `else // SCR1_BP_DYNAMIC
@@ -834,7 +834,7 @@ assign bp_dir_pred = bp_taken;
 `endif // SCR1_BP_DYNAMIC
 
 `ifdef SCR1_BP_RAS_EN
-// Select the carried RAS prediction (registered in the EXE stage, or direct)
+// Select the carried RAS prediction
 `ifndef SCR1_NO_EXE_STAGE
 assign exu_bp_ras_vd     = bp_ras_vd_ff;
 assign exu_bp_ras_target = bp_ras_target_ff;
@@ -842,7 +842,7 @@ assign exu_bp_ras_target = bp_ras_target_ff;
 assign exu_bp_ras_vd     = ifu2exu_bp_ras_vd_i;
 assign exu_bp_ras_target = ifu2exu_bp_ras_target_i;
 `endif // SCR1_NO_EXE_STAGE
-// Correctly predicted return: RAS gave the exact actual target -> suppress flush.
+// Correctly predicted return (RAS target == actual)
 assign ras_hit        = exu_bp_ras_vd & (jb_new_pc == exu_bp_ras_target);
 assign bp_mispredict  = (jb_taken ^ bp_dir_pred) & ~ras_hit;
 `else // SCR1_BP_RAS_EN
@@ -852,10 +852,9 @@ assign bp_recover_seq = exu_queue_vd & bp_mispredict & ~jb_taken;
 
 `ifdef SCR1_BP_DYNAMIC
 //------------------------------------------------------------------------------
-// Dynamic branch predictor - D0 scaffolding (no functional change yet)
+// Dynamic branch predictor
 //------------------------------------------------------------------------------
-// Select the carried prediction (registered in the EXE stage, or direct in the
-// no-EXE-stage config), mirroring how the RAS metadata is selected above.
+// Select the carried prediction
 `ifndef SCR1_NO_EXE_STAGE
 assign exu_bp_predicted_taken = bp_predicted_taken_ff;
 assign exu_bp_index           = bp_index_ff;
@@ -864,40 +863,25 @@ assign exu_bp_predicted_taken = ifu2exu_bp_predicted_taken_i;
 assign exu_bp_index           = ifu2exu_bp_index_i;
 `endif // SCR1_NO_EXE_STAGE
 
-// Training channel to the BHT: pulse on every resolved conditional branch with
-// the index used at fetch and the actual outcome. D0 drives it; IFU consumes it
-// from D1. Only conditional branches train the direction predictor (jumps are
-// unconditional; JALR targets are BTB/RAS territory).
-assign exu2ifu_bp_upd_vd_o    = exu_queue_vd & exu_queue.branch_req & exu_rdy; // one-shot at retire (exu_rdy), else a stalled branch would train the counter every cycle
+// Training channel to the BHT (resolved conditional branches only)
+assign exu2ifu_bp_upd_vd_o    = exu_queue_vd & exu_queue.branch_req & exu_rdy; // one-shot at retire
 assign exu2ifu_bp_upd_index_o = exu_bp_index;
 assign exu2ifu_bp_upd_taken_o = branch_taken;
 `endif // SCR1_BP_DYNAMIC
 
-//------------------------------------------------------------------------------
-// Branch-predictor debug mirrors (ILA mark_debug)
-//------------------------------------------------------------------------------
-// Dedicated wires so the on-chip ILA can observe prediction vs. actual outcome
-// on real silicon without depending on optimizer-churned internal net names.
-// On each retired conditional branch (bp_dbg_brretire=1): bp_dbg_pred is what the
-// predictor said, bp_dbg_actual is what happened, bp_dbg_mispred = they differ,
-// bp_dbg_redirect = pipeline was flushed (the misprediction penalty), bp_dbg_pc =
-// address of the branch. Count brretire vs (mispred & brretire) -> misprediction rate.
-(* mark_debug="true" *) logic                     bp_dbg_pred;      // predicted direction (taken=1)
-(* mark_debug="true" *) logic                     bp_dbg_actual;    // actual outcome (branch taken=1)
-(* mark_debug="true" *) logic                     bp_dbg_mispred;   // prediction != actual outcome
-(* mark_debug="true" *) logic                     bp_dbg_brretire;  // a conditional branch retired this cycle
-(* mark_debug="true" *) logic                     bp_dbg_redirect;  // fetch redirect to IFU (flush / penalty)
-(* mark_debug="true" *) logic [`SCR1_XLEN-1:0]    bp_dbg_pc;        // PC of the instruction in EXU (the branch)
-assign bp_dbg_pred     = bp_dir_pred;
-assign bp_dbg_actual   = branch_taken;
-assign bp_dbg_mispred  = bp_mispredict;
-assign bp_dbg_redirect = exu2ifu_pc_new_req_o;
-assign bp_dbg_pc       = exu2pipe_pc_curr_o;
-`ifdef SCR1_BP_DYNAMIC
-assign bp_dbg_brretire = exu2ifu_bp_upd_vd_o;
-`else
-assign bp_dbg_brretire = exu_queue_vd & exu_queue.branch_req;
-`endif
+`ifdef SCR1_BP_BTB
+// Early-BTB training: resolved taken direct branches/jumps only
+logic btb_train_taken;
+assign btb_train_taken = branch_taken                                            // taken conditional branch
+                       | (exu_queue.jump_req & (exu_queue.sum2_op == SCR1_SUM2_OP_PC_IMM)); // direct jump
+assign exu2ifu_bp_btb_upd_vd_o     = exu_queue_vd & exu_rdy & btb_train_taken;
+assign exu2ifu_bp_btb_upd_pc_o     = pc_curr_ff;
+assign exu2ifu_bp_btb_upd_target_o = jb_new_pc;
+// safe = branch ends on a fetch-word boundary
+assign exu2ifu_bp_btb_upd_safe_o   = ~(pc_curr_ff[1] ^ exu_queue.instr_rvc);
+// is_cond = conditional branch (else unconditional jump)
+assign exu2ifu_bp_btb_upd_is_cond_o = exu_queue.branch_req;
+`endif // SCR1_BP_BTB
 
 // PC to be loaded on MRET from interrupt trap
 assign exu2csr_pc_next_o  = ~exu_queue_vd ? pc_curr_ff
@@ -1242,10 +1226,7 @@ SCR1_SVA_EXU_NEW_PC_REQ_BEFORE_INIT : assert property (
     ) else $error("EXU Error: new PC req generated before reset sequence is done");
 
 `ifdef SCR1_BP_DYNAMIC
-// Invariant (holds in both static and dynamic modes): for jumps the carried
-// prediction equals the EXU mirror (JAL/c.j always-taken, JALR never predicted).
-// Conditional-branch direction may legitimately differ under D1 (BHT vs BTFN),
-// so it is intentionally excluded from this check.
+// For jumps the carried prediction equals the EXU mirror
 SCR1_SVA_EXU_BP_JUMP_CARRY : assert property (
     @(negedge clk) disable iff (~rst_n)
     (exu_queue_vd & exu_queue.jump_req) |-> (exu_bp_predicted_taken == bp_taken)
