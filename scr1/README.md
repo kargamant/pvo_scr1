@@ -1,198 +1,237 @@
-# SCR1 RISC-V Core
+# Предсказатель переходов для SCR1 (RV32IMC, 3-ступенчатый конвейер)
 
-SCR1 is an open-source and free to use RISC-V compatible MCU-class core, designed and maintained by Syntacore. It is industry-grade and silicon-proven (including full-wafer production), works out of the box in all major EDA flows and Verilator, and comes with extensive collateral and documentation.
+Этот каталог документирует предсказатель переходов, встроенный в ядро **Syntacore
+SCR1** (конфигурация `RV32IMC_MAX`). Здесь — как он устроен, где именно врезан в
+конвейер и почему сделан именно так. Для каждого узла есть отдельный подробный файл
+с разбором кода по строкам; этот README — обзорная карта.
 
-![SCR1 cluster](./docs/img/scr1_cluster.svg)
+> TL;DR. К штатному ядру добавлены четыре структуры — **BTB** (кэш целей),
+> **BHT** (направление), **BTFN** (статический базовый слой) и **RAS** (возвраты).
+> Предсказание делается в **двух точках** (рано — на адресе выборки; поздно — на
+> выходе очереди), обучается из ступени исполнения, **не хранит спекулятивного
+> состояния** и не является источником истины: любая ошибка стоит максимум флаша,
+> а корректность всегда восстанавливает EXU.
 
-## Key features
+---
 
-* Open sourced under SHL-license (see LICENSE file) - unrestricted commercial use allowed
-* RV32I or RV32E ISA base + optional RVM and RVC standard extensions
-* Machine privilege mode only
-* 2 to 4 stage pipeline
-* Optional Integrated Programmable Interrupt Controller with 16 IRQ lines
-* Optional RISC-V Debug subsystem with JTAG interface
-* Optional on-chip Tightly-Coupled Memory
-* 32-bit AXI4/AHB-Lite external interface
-* Written in SystemVerilog
-* Optimized for area and power
-* 3 predefined recommended configurations
-* A number of fine-tuning options for custom configuration
-* Verification suite provided
-* Extensive documentation
+## Конвейер SCR1 с предсказателем
 
-For more information on core architecture, see [SCR1 External Architecture Specification](https://github.com/syntacore/scr1/blob/master/docs/scr1_eas.pdf).
+![Конвейер SCR1 с предсказателем переходов](pipeline.svg)
 
-For more information on project usage, see [SCR1 User Manual](https://github.com/syntacore/scr1/blob/master/docs/scr1_um.pdf).
+<details>
+<summary>Та же схема в Mermaid (правится прямо в markdown)</summary>
 
-## Repository contents
+```mermaid
+flowchart LR
+    IMEM[("IMEM / TCM / DDR")]
 
-|Folder | Description
-|------ | -----------
-|**dependencies**                  | **Dependent submodules**
-|├─ riscv-tests                    | Common source files for RISC-V ISA tests
-|├─ riscv_arch                     | Common source files for RISC-V Architectural tests
-|├─ riscv-compliance               | Common source files for RISC-V Compliance tests
-|└─ coremark                       | Common source files for EEMBC's CoreMark® benchmark
-|**docs**                          | **SCR1 documentation**
-|├─ scr1_eas.pdf                   | SCR1 External Architecture Specification
-|└─ scr1_um.pdf                    | SCR1 User Manual
-|**sim**                           | **Tests and scripts for simulation**
-|├─ tests/common                   | Common source files for tests
-|├─ tests/riscv_isa                | RISC-V ISA tests platform specific source files
-|├─ tests/riscv_compliance         | RISC-V Compliance platform specific source files
-|├─ tests/benchmarks/dhrystone21   | Dhrystone 2.1 benchmark source files
-|├─ tests/benchmarks/coremark      | EEMBC's CoreMark® benchmark platform specific source files
-|├─ tests/isr_sample               | Sample program "Interrupt Service Routine"
-|├─ tests/hello                    | Sample program "Hello"
-|└─ verilator_wrap                 | Wrappers for Verilator simulation
-|**src**                           | **SCR1 RTL source and testbench files**
-|├─ includes                       | Header files
-|├─ core                           | Core top source files
-|├─ top                            | Cluster source files
-|└─ tb                             | Testbench files
+    subgraph IFU["IFU — выборка инструкций"]
+        direction TB
+        FA["адрес выборки<br/>imem_addr_ff"]
+        Q["очередь инструкций<br/>SCR1_IFU_QUEUE_SIZE_WORD"]
+        HD["голова очереди<br/>теневой PC = ifu_head_pc"]
+        FA --> Q --> HD
+    end
 
-## SCR1 source file lists
+    subgraph BP["Предсказатель (добавлено)"]
+        direction TB
+        BTB["BTB — ранний кэш целей<br/>scr1_pipe_btb.sv"]
+        BHT["BHT — 2-бит счётчики<br/>scr1_pipe_bht.sv"]
+        BTFN["BTFN — статика + расчёт цели<br/>scr1_pipe_bpred.sv"]
+        RAS["RAS — стек возвратов<br/>scr1_pipe_ras.sv"]
+    end
 
-SCR1 source file lists of SCR1 can be found in [./src](https://github.com/syntacore/scr1/tree/master/src):
+    IMEM --> FA
+    HD --> IDU["IDU — декод"] --> EXU["EXU — исполнение<br/>(арбитр корректности)"]
 
-* **core.files**    - all synthesized file sources of the SCR1 core
-* **ahb_top.files** - synthesized file sources of AHB cluster
-* **axi_top.files** - synthesized file sources of AXI cluster
-* **ahb_tb.files**  - testbench file sources for AHB cluster (for simulation only)
-* **axi_tb.files**  - testbench file sources for AXI cluster (for simulation only)
+    %% раннее предсказание
+    FA -. "чтение по адресу выборки" .-> BTB
+    BTB -- "steer следующей выборки<br/>(без флаша очереди)" --> FA
+    BHT -. "fetch-side гейт направления" .-> BTB
 
-Library with header files to include is [./src/includes/](https://github.com/syntacore/scr1/tree/master/src/includes)
+    %% позднее предсказание
+    HD --> BTFN
+    HD --> BHT
+    HD --> RAS
+    BHT -- "направление" --> BTFN
+    BTFN -- "взят? + цель (PC+imm)" --> RDR{{"поздний редирект"}}
+    RAS  -- "адрес возврата" --> RDR
+    RDR -- "флаш + steer" --> FA
 
-## Simulation quick start guide
-
-The project contains testbenches, test sources and scripts to quickly start the SCR1 simulation. Before starting the simulation, make sure you have:
-
-* installed RISC-V GCC toolchain,
-* installed one of the supported simulators,
-* initialized submodules with test sources.
-
-### Requirements
-
-#### Operating system
-
-GCC toolchain and make-scripts are supported by most popular Linux-like operating systems.
-
-To run from Windows you can use an additional compatibility layer, such as WSL or Cygwin.
-
-#### RISC-V GCC toolchain
-
-RISC-V GCC toolchain is required to compile the software. You can use pre-built binaries or build the toolchain from scratch.
-
-##### Using pre-built binary tools
-
-Pre-built RISC-V GCC toolchain with support for all SCR1 architectural configurations is available for download from https://syntacore.com/tools/development-tools.
-
-1. Download the archive for your platform.
-2. Extract the archive to preferred directory `<GCC_INSTALL_PATH>`.
-3. Add the `<GCC_INSTALL_PATH>/bin` folder to the $PATH environment variable:
+    %% корректность и обучение
+    EXU == "редирект (всегда выигрывает)" ==> FA
+    EXU == "обучение целей" ==> BTB
+    EXU == "обучение направлений" ==> BHT
 ```
-    export PATH=<GCC_INSTALL_PATH>/bin:$PATH
+</details>
+
+**Две точки предсказания:**
+- **Рано** — `BTB` читается по адресу выборки `imem_addr_ff` (ещё до декода) и
+  **меняет только следующий адрес выборки**, без флаша очереди → убирает «пузырь
+  взятого перехода» прямо на этапе выборки. Направление раннего steer'а
+  подтверждает `BHT` через второй порт чтения (fetch-side гейт).
+- **Поздно** — на голове очереди (`ifu_head_pc`) работают `BTFN` (цель `PC+imm` +
+  направление), `BHT` (динамическое направление) и `RAS` (цель возврата). Они
+  делают штатный редирект с флашем, когда переход дошёл до головы очереди.
+- **Арбитр** — `EXU`: реальный mispredict перекрывает любое предсказание; обе
+  обучаемые таблицы (BTB, BHT) тренируются из EXU на retire.
+
+---
+
+## Немного теории
+
+Предсказание перехода делится на два независимых вопроса:
+1. **Направление** (*direction*): будет ли условная ветка взята? → **BHT** (+ BTFN
+   как статический дефолт).
+2. **Цель** (*target*): если взят — куда? → **BTB** для прямых целей, **RAS** для
+   возвратов (косвенных).
+
+**Пузырь взятого перехода.** Конвейер по умолчанию тащит слова последовательно
+(`PC, PC+4, …`). На взятом переходе всё, выбранное после него и до цели, — мусор;
+эти такты потеряны. Чем позже узнаём про переход, тем больше пузырь. Задача
+предсказателя — узнать исход/цель **как можно раньше** и сразу тащить с цели.
+
+Подробнее — в разделах «Краткая теория» каждого файла и в
+[knowledge base по предсказателям](../../README.md) (при наличии).
+
+---
+
+## Компоненты (обзор + ссылки на детальный разбор)
+
+| Узел | Файл модуля | Что делает | Подробно |
+|---|---|---|---|
+| **BTB** | `scr1_pipe_btb.sv` | Directly-mapped тегированный кэш целей, читается по адресу выборки, рулит следующей выборкой без флаша | [01_btb.md](01_btb.md) |
+| **BTFN** | `scr1_pipe_bpred.sv` | Статический слой на выходе очереди: детект перехода по opcode, расчёт цели `PC+imm`, направление (fallback для BHT) | [02_btfn.md](02_btfn.md) |
+| **BHT** | `scr1_pipe_bht.sv` | Динамическое направление: 1024×(2-бит счётчик + valid); два порта чтения (поздний + fetch-side гейт) | [03_bht.md](03_bht.md) |
+| **RAS** | `scr1_pipe_ras.sv` | Стек адресов возврата глубины 4: `call` кладёт, `ret` снимает вершину как предсказанную цель | [04_ras.md](04_ras.md) |
+| **Интеграция** | `scr1_pipe_ifu/exu/top.sv` | Теневой PC, арбитраж двух точек, приоритеты, круговорот обучения | [05_integration.md](05_integration.md) |
+
+Каждый детальный файл устроен одинаково: *теория → смысл → принцип → разбор кода
+модуля с номерами строк → точки вставки в ядро → таблица «почему так / альтернативы»*.
+
+---
+
+## Что происходит с переходом — по шагам
+
+Проследим один переход по мере его движения через конвейер.
+
+**1. Выборка из памяти — раннее предсказание (BTB + BHT).**
+Каждый такт IFU выбирает из памяти очередное слово по текущему адресу. Тот же адрес
+одновременно подаётся на BTB. Если BTB когда-то уже разрешал здесь взятый переход и
+запомнил его цель (и старшие биты адреса совпали — значит это та же команда), он
+подсказывает эту цель. Тогда IFU **следующим тактом выбирает уже с цели**, а не по
+порядку — пузырь взятого перехода не возникает. Для условной ветки такое раннее
+перенаправление разрешается только если BHT (по накопленной истории именно этой
+ветки) говорит «скорее взят»; безусловный переход уводится всегда. Само слово с
+переходом при этом спокойно доезжает в очереди — ничего не выбрасывается.
+
+**2. Голова очереди — позднее предсказание (BTFN + BHT + RAS).**
+Когда команда доходит до головы очереди, её уже можно разобрать. Здесь работает
+поздний слой: BTFN по коду операции опознаёт переход и вычисляет цель, прибавляя
+смещение из команды к её адресу; направление берётся у BHT (история этой ветки), а
+если ветка ещё ни разу не встречалась — по простому правилу «переход назад обычно
+взят». Возврат из функции — отдельный случай: его цель заранее лежит на вершине
+стека RAS. Если этот переход **не** был уведён ещё на шаге 1, IFU перенаправляет
+выборку здесь — с очисткой уже набранных лишних слов (это дороже, чем ранний steer,
+но ловит то, что BTB рулить не умеет: возвраты и переходы на нечётной границе RVC).
+
+**3. Вызовы и возвраты — сопровождение RAS.**
+Пока команды проходят через голову очереди, RAS следит за вызовами: увидев вызов
+функции (переход с сохранением адреса возврата в регистр `x1`/`x5`), он кладёт на
+вершину стека адрес *следующей* команды. Увидев возврат — снимает вершину и отдаёт
+её как предсказанную цель. Стек зеркалит вложенность вызовов, поэтому возвращается
+всегда «куда надо», даже если функцию звали из разных мест.
+
+**4. Исполнение — обучение таблиц (EXU, на retire).**
+В EXU переход окончательно разрешается: становится точно известно, взят он или нет и
+какова настоящая цель. По этому факту таблицы дообучаются:
+- у соответствующей записи **BHT** 2-битный счётчик сдвигается к исходу (взят → в
+  сторону «взят», не взят → в сторону «не взят») — так предсказание этой ветки
+  становится точнее. Какую именно запись править, не пересчитывается заново: её
+  адрес-индекс был вычислен ещё при выборке и проехал вместе с командой до EXU,
+  поэтому обучается ровно та запись, из которой делали предсказание;
+- **BTB** запоминает цель, если это был **взятый прямой** переход (ветка или
+  `JAL`/`c.j`); косвенные возвраты в BTB не пишутся — это забота RAS.
+
+**5. EXU — арбитр истины.**
+Если реальный исход разошёлся с предсказанием, EXU перенаправляет выборку на
+правильный адрес, и это перекрывает любую подсказку предсказателя. Поэтому ошибка
+любой из таблиц стоит максимум нескольких потерянных тактов — но **никогда не
+приводит к неверному результату**. Отсюда и главный принцип: предсказатель — только
+подсказка, у него нет ни спекулятивного состояния, ни логики отката.
+
+> Полная версия с именами сигналов и номерами строк — в [05_integration.md](05_integration.md).
+
+---
+
+## Детальные схемы — куда конкретно встроены блоки
+
+Обзорная диаграмма выше — высокоуровневая. Ниже две схемы показывают конкретную
+врезку предсказателя в тракт выборки и в ступень исполнения.
+
+**Выборка (IFU): ранний BTB и fetch-порт BHT**
+
+![Деталь: BTB и BHT в тракте выборки IFU](fetch_detail.svg)
+
+**Исполнение (EXU): разрешение перехода и обучение таблиц**
+
+![Деталь: обучение BHT/BTB и редирект из EXU](exu_detail.svg)
+
+---
+
+## RVC: где потолок
+
+RV32IMC разрешает 16-битные сжатые команды, из-за чего переход может кончаться в
+середине fetch-слова. BTB рулит только **безопасными** переходами
+(`safe = ~(pc[1] ^ rvc)` — заканчиваются на границе слова). RVC-в-младшей-половине
+и невыровненный RVI (~⅔ взятых переходов) не стерятся без предекода — это
+фундаментальный потолок предсказателя-only на сжатом коде. Разбор с примерами и
+таблицей 4 случаев — в [01_btb.md, §5](01_btb.md).
+
+---
+
+## Конфигурация (`scr1/src/includes/scr1_arch_description.svh`)
+
+| define / параметр | включает |
+|---|---|
+| `SCR1_BPRED_EN` | базовый BTFN + поздний редирект |
+| `SCR1_BP_DYNAMIC`, `SCR1_BP_BHT_SIZE` | динамический BHT |
+| `SCR1_BP_RAS_EN`, `SCR1_RAS_DEPTH` | RAS |
+| `SCR1_BP_BTB`, `SCR1_BP_BTB_SIZE` | ранний BTB + fetch-side гейт |
+| `SCR1_IFU_QUEUE_SIZE_WORD` | глубина очереди фетча (параметр фронтенда) |
+
+Все узлы под `\`ifdef`, поэтому конфигурации от «чистого BTFN» до «BTB+BHT+RAS»
+собираются без правки RTL, и вклад каждого можно мерить отдельно.
+
+---
+
+## Результаты (кремний, Nexys A7-100T, 30 МГц)
+
+Предсказатель-only на CoreMark (одинаковая глубина очереди, vs ядро без BPU):
+- **rv32imc: −8.76 %**, **rv32im: −14.26 %** (на выровненном коде steer'ится почти
+  всё; на сжатом ограничивает RVC-стена).
+
+Все прогоны с золотым CRC. Полная методика и разбивка (предсказатель vs очередь) —
+в [BPRED_REPORT.md](../BPRED_REPORT.md).
+
+---
+
+## Карта файлов
+
+```
+scr1/src/core/pipeline/
+  scr1_pipe_btb.sv     — BTB (новый)
+  scr1_pipe_bpred.sv   — BTFN (новый; адаптация Ibex, Apache-2.0)
+  scr1_pipe_bht.sv     — BHT (новый; адаптация CVA6, Solderpad-2.0)
+  scr1_pipe_ras.sv     — RAS (новый; адаптация CVA6, Solderpad-2.0)
+  scr1_pipe_ifu.sv     — интеграция: инстансы, steer, теневой PC, арбитраж
+  scr1_pipe_exu.sv     — обучение BTB/BHT, mispredict/redirect
+  scr1_pipe_top.sv     — проводка каналов обучения
+scr1/src/includes/
+  scr1_arch_description.svh — конфиг-define'ы предсказателя
 ```
 
-##### Building tools from source
+---
 
-You can build the RISC-V GCC toolchain from sources, stored in official repo https://github.com/riscv/riscv-gnu-toolchain
-
-Instructions on how to prepare and build the toolchain can be found on https://github.com/riscv/riscv-gnu-toolchain/blob/master/README.md
-
-We recommend using the multilib compiler. Please note that RV32IC, RV32E, RV32EM, RV32EMC, RV32EC architectural configurations are not included in the compiler by default. If you plan to use them, you will need to include the appropriate libraries by yourself before building.
-
-After the building, be sure to add the `<GCC_INSTALL_PATH>/bin` folder to the $PATH environment variable
-
-
-#### HDL simulators
-
-Currently supported simulators:
-
-* Verilator (last verified version: v5.014)
-* Mentor Graphics ModelSim (last verified version: INTEL FPGA STARTER EDITION 2020.1)
-* Synopsys VCS (last verified version: S-2021.09-1)
-* Cadence NCSim (last verified version: 22.09-s004)
-
-Please note that RTL simulator executables should be in your $PATH variable.
-
-#### Tests preparation
-
-The simulation package includes the following tests:
-
-* **hello** - "Hello" sample program
-* **isr_sample** - "Interrupt Service Routine" sample program
-* **riscv_isa** - RISC-V ISA tests (submodule)
-* **riscv_arch** - RISC-V Architectural tests (submodule)
-* **riscv_compliance** - RISC-V Compliance tests (submodule)
-* **dhrystone21** - Dhrystone 2.1 benchmark
-* **coremark** - EEMBC's CoreMark® benchmark (submodule)
-
-After the main SCR1 repository has been cloned execute the following command:
-```
-    git submodule update --init --recursive
-```
-
-This command will initialized submodules with test sources.
-
-### Running simulation
-
-To build RTL, compile and run tests from the repo root folder you have to call Makefile.
-By default, you may simply call Makefile without any parameters:
-``` sh
-    make
-```
-
-In this case simulation will run on Verilator with following parameters: `CFG=MAX BUS=AHB TRACE=0 TARGETS="hello isr_sample riscv_isa riscv_compliance dhrystone21 coremark"`.
-
-Makefile supports:
-
-* choice of simulator - `run_<SIMULATOR> = <run_vcs, run_modelsim, run_ncsim, run_verilator, run_verilator_wf>`
-* selection of external interface - `BUS = <AHB, AXI>`,
-* configuration setup - `CFG = <MAX, BASE, MIN, CUSTOM>`,
-* parameters for CUSTOM configuration - `ARCH = <IMC, IC, IM, I, EMC, EM, EC, E>, VECT_IRQ = <0, 1>, IPIC = <0, 1>, TCM = <0, 1>`
-* tests subset to run - `TARGETS = <hello, isr_sample, riscv_isa, riscv_compliance, riscv_arch, dhrystone21, coremark>`
-* enabling tracelog - `TRACE = <0, 1>`
-* and any additional options to pass to the simulator - `SIM_BUILD_OPTS`.
-
-Examples:
-``` sh
-    make run_verilator_wf CFG=MAX BUS=AXI TARGETS="riscv_isa riscv_compliance" TRACE=1
-    make run_vcs CFG=BASE BUS=AHB TARGETS="dhrystone21 coremark" SIM_BUILD_OPTS="-gui"
-    make run_modelsim CFG=CUSTOM BUS=AXI ARCH=I VECT_IRQ=1 IPIC=1 TCM=0 TARGETS=isr_sample
-```
-
-Build and run parameters can be configured in the `./Makefile`.
-
-After all the tests have finished, the results can be found in `build/<SIM_CFG>/test_results.txt`.
-
-**IMPORTANT:** To ensure correct rebuild, please clean build directory between simulation runs:
-``` sh
-    make clean
-```
-
-Please refer to the *"Simulation environment"* chapter of the [SCR1 User Manual](https://github.com/syntacore/scr1/blob/master/docs/scr1_um.pdf) for more information on setting up a simulation run.
-
-## SCR1 SDKs
-
-FPGA-based SDKs are available at the <https://github.com/syntacore/scr1-sdk>.
-
-Repo contains:
-
-* Pre-build images and open designs for several standard FPGAs boards:
-  * Digilent Arty (Xilinx)
-  * Digilent Nexys 4 DDR (Xilinx)
-  * Arria V GX Starter (Intel)
-  * Terasic DE10-Lite (Intel)
-* Software package:
-  * Bootloader
-  * Zephyr RTOS
-  * Tests\SW samples
-* User Guides for SDKs and tools
-
-## Contacts
-
-Report an issue: <https://github.com/syntacore/scr1/issues>
-
-Ask a question: scr1@syntacore.com
+*Детальные файлы (`01_btb.md` … `05_integration.md`) содержат разбор кода по строкам
+и обоснование каждого решения с альтернативами.*
