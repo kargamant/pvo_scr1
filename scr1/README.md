@@ -102,7 +102,7 @@ scr1/src/core/pipeline/
   scr1_pipe_exu.sv     -обучение BTB/BHT, mispredict/redirect
   scr1_pipe_top.sv     -проводка каналов обучения
 scr1/src/includes/
-
+```
 
 другие мои репозитории за время обучения:
 1) MCP-тулы для vivado 2019 и minicom для возможности удобной пересборки проекта и автотестов на плате. 
