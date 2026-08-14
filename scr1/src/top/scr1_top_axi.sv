@@ -383,7 +383,7 @@ scr1_core_top i_core_top (
 scr1_cache_wrapper #(
     // Cache only the 128 MiB DDR2 window: 0x0000_0000 - 0x07FF_FFFF.
     // TCM, timer, BRAM and external MMIO therefore use the uncached path.
-    .ICACHE_BRAM_ADDR_MASK     (32'hFFFF_0000),
+    .ICACHE_BRAM_ADDR_MASK     ('0),
     .ICACHE_BRAM_ADDR_PATTERN  (32'hFFFF_0000),
     .ICACHE_DDR_ADDR_MASK     (32'hF800_0000),
     .ICACHE_DDR_ADDR_PATTERN  ('0),
