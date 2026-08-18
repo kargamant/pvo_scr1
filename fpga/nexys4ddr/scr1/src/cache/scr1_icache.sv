@@ -8,7 +8,7 @@ module scr1_icache #(
     parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_BRAM_ADDR_PATTERN = '0,
     parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_MASK    = '0,
     parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_PATTERN = '0,
-    parameter int unsigned                  NUM_LINES              = 64,
+    parameter int unsigned                  NUM_LINES              = 2048,
     parameter int unsigned                  LINE_WORDS             = 4
 ) (
     input  logic                              clk,
