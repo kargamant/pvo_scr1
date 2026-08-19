@@ -4,11 +4,9 @@
 `include "scr1_memif.svh"
 
 module scr1_icache #(
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_BRAM_ADDR_MASK    = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_BRAM_ADDR_PATTERN = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_MASK    = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_DDR_ADDR_PATTERN = '0,
-    parameter int unsigned                  NUM_LINES              = 2048,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_ADDR_MASK    = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] CACHEABLE_ADDR_PATTERN = '0,
+    parameter int unsigned                  NUM_LINES              = 64,
     parameter int unsigned                  LINE_WORDS             = 4
 ) (
     input  logic                              clk,
@@ -104,10 +102,8 @@ module scr1_icache #(
     assign fill_data_index = {req_line_index, fill_word_q};
     assign req_tag        = req_addr_q[`SCR1_IMEM_AWIDTH-1 -: TAG_BITS];
 
-    assign req_cacheable = ((req_addr_q & CACHEABLE_BRAM_ADDR_MASK) == CACHEABLE_BRAM_ADDR_PATTERN) ||
-                            ((req_addr_q & CACHEABLE_DDR_ADDR_MASK) == CACHEABLE_DDR_ADDR_PATTERN);
-    assign cpu_addr_cacheable = ((cpu_addr_i & CACHEABLE_BRAM_ADDR_MASK) == CACHEABLE_BRAM_ADDR_PATTERN) ||
-                            ((cpu_addr_i & CACHEABLE_DDR_ADDR_MASK) == CACHEABLE_DDR_ADDR_PATTERN);
+    assign req_cacheable = (req_addr_q & CACHEABLE_ADDR_MASK) == CACHEABLE_ADDR_PATTERN;
+    assign cpu_addr_cacheable = (cpu_addr_i & CACHEABLE_ADDR_MASK) == CACHEABLE_ADDR_PATTERN;
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
 

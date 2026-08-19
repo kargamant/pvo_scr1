@@ -2,10 +2,8 @@
 `include "scr1_memif.svh"
 
 module scr1_cache_wrapper #(
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_BRAM_ADDR_MASK    = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_BRAM_ADDR_PATTERN = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_DDR_ADDR_MASK    = '0,
-    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_DDR_ADDR_PATTERN = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_ADDR_MASK    = '0,
+    parameter logic [`SCR1_IMEM_AWIDTH-1:0] ICACHE_ADDR_PATTERN = '0,
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] DCACHE_ADDR_MASK    = '0,
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] DCACHE_ADDR_PATTERN = '0
 ) (
@@ -56,10 +54,8 @@ module scr1_cache_wrapper #(
 );
 
     scr1_icache #(
-        .CACHEABLE_BRAM_ADDR_MASK    (ICACHE_BRAM_ADDR_MASK),
-        .CACHEABLE_BRAM_ADDR_PATTERN (ICACHE_BRAM_ADDR_PATTERN),
-        .CACHEABLE_DDR_ADDR_MASK     (ICACHE_DDR_ADDR_MASK),
-        .CACHEABLE_DDR_ADDR_PATTERN     (ICACHE_DDR_ADDR_PATTERN)
+        .CACHEABLE_ADDR_MASK     (ICACHE_ADDR_MASK),
+        .CACHEABLE_ADDR_PATTERN     (ICACHE_ADDR_PATTERN)
     ) i_icache (
         .clk                    (clk),
         .rst_n                  (rst_n),
