@@ -92,9 +92,9 @@
 ## Оценка на бенчмарках (verilator)
 
 Помимо CoreMark/qsort предсказатель прогнан на широком наборе Embench-IoT (16 программ) и оценён по прямой точности направления
-(CBP / black-parrot). Полные таблицы и методика - [embench_suite.md](/bpd_docs/embench_suite.md) и [trace_accuracy.md](/bpd_docs/trace_accuracy.md).
-Рекомендованные значения параметров по классам задач (оптимум выигрыш/площадь) - [recommended_config.md](/bpd_docs/recommended_config.md). Все измерения одним файлом -
-[all_measurements.md](/bpd_docs/all_measurements.md).
+(CBP / black-parrot). Полные таблицы и методика - [embench_suite.md](bpd_docs/embench_suite.md) и [trace_accuracy.md](bpd_docs/trace_accuracy.md).
+Рекомендованные значения параметров по классам задач (оптимум выигрыш/площадь) - [recommended_config.md](bpd_docs/recommended_config.md). Все измерения одним файлом -
+[all_measurements.md](bpd_docs/all_measurements.md).
 
 ### Выигрыш по циклам (predictor-only vs ядро без BPU)
 
@@ -123,7 +123,7 @@
 ### Рекомендованные значения размеров
 
 Свипы по 16 бенчам дают чёткий sweet-spot: **BHT 128, BTB 64, RAS 4, gshare выкл** 
-Больший BHT (4096) оправдан для редкого класса «автоматы состояний / сильный алиасинг» (nsichneu: −2.9 % сверх базы).  Матрица по классам задач и критерий выбора - [recommended_config.md](recommended_config.md).
+Больший BHT (4096) оправдан для редкого класса «автоматы состояний / сильный алиасинг» (nsichneu: −2.9 % сверх базы).  Матрица по классам задач и критерий выбора - [recommended_config.md](bpd_docs/recommended_config.md).
 ## Карта файлов
 
 ```
