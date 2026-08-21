@@ -1,0 +1,19 @@
+# build artifacts
+build/
+sw/build/
+*.o
+*.elf
+*.bin
+*.dump
+*.map
+*.vvp
+
+# integration backups (местные копии оригиналов SoC)
+soc_integration_backup_*/
+
+# vivado non-project build junk (если собираете build_pattern.tcl тут)
+*.jou
+*.log
+.Xil/
+vivado*.str
+usage_statistics_webtalk.*

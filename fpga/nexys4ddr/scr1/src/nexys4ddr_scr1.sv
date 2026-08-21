@@ -39,7 +39,16 @@ module nexys4ddr_scr1 (
     inout  logic    [ 7:0]          JC,
     // === FTDI UART =======================================
     input  logic                    FTDI_TXD,
-    output logic                    FTDI_RXD
+    output logic                    FTDI_RXD,
+    // === VGA (snake) =====================================
+    output logic [3:0]              VGA_R,
+    output logic [3:0]              VGA_G,
+    output logic [3:0]              VGA_B,
+    output logic                    VGA_HS,
+    output logic                    VGA_VS,
+    // === PS/2 keyboard via USB-HID host ==================
+    input  logic                    PS2_CLK,
+    input  logic                    PS2_DATA
 );
 
 //=======================================================
@@ -61,53 +70,56 @@ logic                               cpu_reset;
 `ifdef SCR1_DBG_EN
 logic                               sys_rst_n;
 `endif // SCR1_DBG_EN
+// VIO-driven soft reset: 1 = inactive, 0 = assert (ANDed with CPU_RESETn below
+// so either the physical button or a JTAG VIO probe can trigger a reset).
+logic                               vio_soft_rst_n;
 
 // --- SCR1 ---------------------------------------------
 
-// AXI IMEM
+// AXI IMEM   (signals tagged mark_debug are probed by the ILA - see scr1_ila_debug.tcl)
 logic [ 2:0]                        axi_imem_arid;
-logic [31:0]                        axi_imem_araddr;
-logic                               axi_imem_arvalid;
-logic                               axi_imem_arready;
-logic [ 7:0]                        axi_imem_arlen;
+(* mark_debug="true" *) logic [31:0] axi_imem_araddr;
+(* mark_debug="true" *) logic       axi_imem_arvalid;
+(* mark_debug="true" *) logic       axi_imem_arready;
+(* mark_debug="true" *) logic [ 7:0] axi_imem_arlen;
 logic [ 2:0]                        axi_imem_arsize;
 logic [ 1:0]                        axi_imem_arburst;
 logic [ 3:0]                        axi_imem_arcache;
 logic [ 2:0]                        axi_imem_rid;
-logic [31:0]                        axi_imem_rdata;
-logic                               axi_imem_rvalid;
-logic                               axi_imem_rready;
-logic [ 1:0]                        axi_imem_rresp;
-logic                               axi_imem_rlast;
+(* mark_debug="true" *) logic [31:0] axi_imem_rdata;
+(* mark_debug="true" *) logic       axi_imem_rvalid;
+(* mark_debug="true" *) logic       axi_imem_rready;
+(* mark_debug="true" *) logic [ 1:0] axi_imem_rresp;
+(* mark_debug="true" *) logic       axi_imem_rlast;
 // AXI DMEM
 logic [ 1:0]                        axi_dmem_awid;
-logic [31:0]                        axi_dmem_awaddr;
-logic                               axi_dmem_awvalid;
-logic                               axi_dmem_awready;
+(* mark_debug="true" *) logic [31:0] axi_dmem_awaddr;
+(* mark_debug="true" *) logic       axi_dmem_awvalid;
+(* mark_debug="true" *) logic       axi_dmem_awready;
 logic [ 7:0]                        axi_dmem_awlen;
 logic [ 2:0]                        axi_dmem_awsize;
 logic [ 1:0]                        axi_dmem_awburst;
 logic [ 3:0]                        axi_dmem_awcache;
-logic [31:0]                        axi_dmem_wdata;
-logic [ 3:0]                        axi_dmem_wstrb;
-logic                               axi_dmem_wvalid;
+(* mark_debug="true" *) logic [31:0] axi_dmem_wdata;
+(* mark_debug="true" *) logic [ 3:0] axi_dmem_wstrb;
+(* mark_debug="true" *) logic       axi_dmem_wvalid;
 logic                               axi_dmem_wready;
-logic                               axi_dmem_wlast;
+(* mark_debug="true" *) logic       axi_dmem_wlast;
 logic [ 1:0]                        axi_dmem_bid;
 logic [ 1:0]                        axi_dmem_bresp;
-logic                               axi_dmem_bvalid;
+(* mark_debug="true" *) logic       axi_dmem_bvalid;
 logic                               axi_dmem_bready;
 logic [ 1:0]                        axi_dmem_arid;
-logic [31:0]                        axi_dmem_araddr;
-logic                               axi_dmem_arvalid;
+(* mark_debug="true" *) logic [31:0] axi_dmem_araddr;
+(* mark_debug="true" *) logic       axi_dmem_arvalid;
 logic                               axi_dmem_arready;
 logic [ 7:0]                        axi_dmem_arlen;
 logic [ 2:0]                        axi_dmem_arsize;
 logic [ 1:0]                        axi_dmem_arburst;
 logic [ 3:0]                        axi_dmem_arcache;
 logic [ 1:0]                        axi_dmem_rid;
-logic [31:0]                        axi_dmem_rdata;
-logic                               axi_dmem_rvalid;
+(* mark_debug="true" *) logic [31:0] axi_dmem_rdata;
+(* mark_debug="true" *) logic       axi_dmem_rvalid;
 logic                               axi_dmem_rready;
 logic [ 1:0]                        axi_dmem_rresp;
 logic                               axi_dmem_rlast;
@@ -133,11 +145,11 @@ logic                               jtag_tdo_en;
 `endif // SCR1_DBG_EN
 
 // --- UART ---------------------------------------------
-logic                               uart_rxd;   // -> UART
-logic                               uart_txd;   // <- UART
+(* mark_debug="true" *) logic       uart_rxd;   // -> UART
+(* mark_debug="true" *) logic       uart_txd;   // <- UART
 logic                               uart_rts_n; // <- UART
 logic                               uart_dtr_n; // <- UART
-logic                               uart_irq;
+(* mark_debug="true" *) logic       uart_irq;
 
 // --- Heartbeat ----------------------------------------
 logic [31:0]                        rtc_counter;
@@ -153,11 +165,22 @@ begin
     if (~pwrup_rst_n) begin
         extn_rst_n_sync     <= '0;
     end else begin
-        extn_rst_n_sync[0]  <= CPU_RESETn;
+        extn_rst_n_sync[0]  <= CPU_RESETn & vio_soft_rst_n;
         extn_rst_n_sync[1]  <= extn_rst_n_sync[0];
     end
 end
 assign extn_rst_n = extn_rst_n_sync[1];
+
+// VIO: lets Vivado Hardware Manager pulse a reset over JTAG (no physical
+// CPU_RESET button press needed). probe_out0 idles at 1 (see
+// C_PROBE_OUT0_INIT_VAL in the IP customization) and is pulled to 0 briefly
+// to assert, mirroring a button press; the existing 16-cycle hard_rst_n
+// hold logic above handles debounce/timing the same as it does for the
+// physical button.
+vio_reset u_vio_reset (
+    .clk        (cpu_clk),
+    .probe_out0 (vio_soft_rst_n)
+);
 
 always_ff @(posedge cpu_clk, negedge pwrup_rst_n)
 begin
@@ -485,7 +508,15 @@ i_soc (
     // IDs
     .soc_id_tri_i               (FPGA_NEXYS_A7_SOC_ID),
     .bld_id_tri_i               (FPGA_NEXYS_A7_BLD_ID),
-    .core_clk_freq_tri_i        (FPGA_NEXYS_A7_CORE_CLK_FREQ)
+    .core_clk_freq_tri_i        (FPGA_NEXYS_A7_CORE_CLK_FREQ),
+    // VGA + PS/2 (snake peripherals)
+    .vga_r                      (VGA_R),
+    .vga_g                      (VGA_G),
+    .vga_b                      (VGA_B),
+    .vga_hs                     (VGA_HS),
+    .vga_vs                     (VGA_VS),
+    .ps2_clk_pin                (PS2_CLK),
+    .ps2_data_pin               (PS2_DATA)
 );
 
 //==========================================================

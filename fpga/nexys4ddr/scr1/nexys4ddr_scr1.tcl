@@ -82,7 +82,7 @@ set_msg_config  -ruleid {3}  -id {Synth 8-3917}  -suppress  -source 16
 
 # Set project properties
 set obj [current_project]
-set_property -name "board_part" -value "digilentinc.com:nexys4_ddr:part0:1.1" -objects $obj
+set_property -name "board_part" -value "digilentinc.com:nexys-a7-100t:part0:1.3" -objects $obj
 set_property -name "default_lib" -value "xil_defaultlib" -objects $obj
 set_property -name "ip_cache_permissions" -value "read write" -objects $obj
 set_property -name "ip_output_repo" -value "$proj_dir/${_xil_proj_name_}.cache/ip" -objects $obj
@@ -113,6 +113,10 @@ set files [list \
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_mprf.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_lsu.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_ifu.sv"]"\
+ "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_bpred.sv"]"\
+ "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_ras.sv"]"\
+ "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_bht.sv"]"\
+ "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_btb.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_idu.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_ialu.sv"]"\
  "[file normalize "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_exu.sv"]"\
@@ -207,6 +211,26 @@ set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
 
 set file "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_ifu.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_bpred.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_ras.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_bht.sv"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
+
+set file "$origin_dir/../../../scr1/src/core/pipeline/scr1_pipe_btb.sv"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "SystemVerilog" -objects $file_obj
@@ -407,6 +431,19 @@ set obj [get_filesets sim_1]
 set obj [get_filesets sim_1]
 set_property -name "top" -value "nexys4ddr_scr1" -objects $obj
 set_property -name "verilog_define" -value "SCR1_ARCH_CUSTOM=1" -objects $obj
+
+
+# Create 'vio_reset' IP (JTAG-driven soft reset for the SCR1 bootloader flow;
+# probe_out0 is ANDed into CPU_RESETn's synchronizer in nexys4ddr_scr1.sv so a
+# JTAG VIO write can trigger a reset without pressing the physical button)
+create_ip -name vio -vendor xilinx.com -library ip -version 3.0 -module_name vio_reset -dir "$proj_dir/${_xil_proj_name_}.srcs/sources_1/ip"
+set_property -dict [list \
+  CONFIG.C_NUM_PROBE_OUT {1} \
+  CONFIG.C_NUM_PROBE_IN {0} \
+  CONFIG.C_PROBE_OUT0_WIDTH {1} \
+  CONFIG.C_PROBE_OUT0_INIT_VAL {0x1} \
+] [get_ips vio_reset]
+generate_target {instantiation_template} [get_ips vio_reset]
 
 
 # Adding sources referenced in BDs, if not already added

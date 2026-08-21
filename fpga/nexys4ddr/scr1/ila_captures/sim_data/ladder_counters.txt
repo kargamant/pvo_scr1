@@ -1,0 +1,8 @@
+CONFIG OFF dhry=369 cm=5014
+   stat0 cycles=622111 branches=61952 taken=32069 mispred=32069
+CONFIG BTFN dhry=346 cm=4917
+   stat0 cycles=603325 branches=61952 taken=32069 mispred=11595
+CONFIG BTFN_RAS dhry=345 cm=4905
+   stat0 cycles=601995 branches=61952 taken=32069 mispred=11595
+CONFIG FULL dhry=343 cm=4789
+   stat0 cycles=589931 branches=61952 taken=32069 mispred=4184

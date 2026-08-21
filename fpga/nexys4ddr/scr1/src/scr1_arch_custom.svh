@@ -26,6 +26,9 @@
 //`define SCR1_CFG_RV32IC_BASE
 //`define SCR1_CFG_RV32EC_MIN
 
+// Note: do not enable SCR1_NO_DEC_STAGE here. It was evaluated and rejected; the
+// reasoning is recorded in the RV32IMC_MAX block of scr1_arch_description.svh.
+
 
 
 parameter bit [`SCR1_XLEN-1:0]          SCR1_ARCH_RST_VECTOR        = 'hFFFFFF00;   // Reset vector
