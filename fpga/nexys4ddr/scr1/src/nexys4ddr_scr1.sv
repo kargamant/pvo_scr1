@@ -42,6 +42,10 @@ module nexys4ddr_scr1 (
     output logic                    FTDI_RXD
 );
 
+`ifdef SCR1_DEBUG_ILA
+ila_0 uart_ftdi_ila(cpu_clk, FTDI_TXD, FTDI_RXD);
+`endif // SCR1_DEBUG_ILA
+
 //=======================================================
 //  PARAMETER declarations
 //=======================================================
