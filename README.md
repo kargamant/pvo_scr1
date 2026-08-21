@@ -1,4 +1,6 @@
-# Open-source modification of SCR1 core
+# PVO_SCR1  
+
+A modification of an open-source SCR1 core.  
 
 ## Current core modifications  
 - [instruction cache and data cache](https://github.com/kargamant/pvo_scr1/tree/cache/fpga/nexys4ddr/scr1/src/cache) - [Deriglazov E.D.](https://github.com/kargamant)
