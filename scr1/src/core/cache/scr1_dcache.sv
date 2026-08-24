@@ -6,8 +6,8 @@
 module scr1_dcache #(
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] CACHEABLE_ADDR_MASK    = '0,
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] CACHEABLE_ADDR_PATTERN = '0,
-    parameter int unsigned                  NUM_LINES              = 64,
-    parameter int unsigned                  LINE_WORDS             = 4
+    parameter int unsigned                  NUM_LINES              = SCR1_DCACHE_NUM_LINES,
+    parameter int unsigned                  LINE_WORDS             = SCR1_DCACHE_LINE_WORDS
 ) (
     input  logic                              clk,
     input  logic                              rst_n,

@@ -176,6 +176,11 @@ parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TCM_ADDR_PATTERN       = 'h00480000
 parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TIMER_ADDR_MASK        = 'hFFFFFFE0;       // Timer mask
 parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TIMER_ADDR_PATTERN     = 'h00490000;       // Timer address match pattern
 
+parameter int unsigned                  SCR1_ICACHE_NUM_LINES       = 64;
+parameter int unsigned                  SCR1_ICACHE_LINE_WORDS      = 4;
+parameter int unsigned                  SCR1_DCACHE_NUM_LINES       = 64;
+parameter int unsigned                  SCR1_DCACHE_LINE_WORDS      = 4;
+
 // Device build ID
  `define SCR1_ARCH_BUILD_ID             `SCR1_MIMPID
 
