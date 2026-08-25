@@ -4,7 +4,7 @@ A modification of an open-source SCR1 core.
 
 ## Current core modifications  
 - [instruction cache and data cache](https://github.com/kargamant/pvo_scr1/tree/cache/scr1/src/core/cache) - [Deriglazov E.D.](https://github.com/kargamant)
-- [branch predictors](https://github.com/kargamant/pvo_scr1/tree/bpd/scr1) - [Kuricyn M.V.](https://github.com/mihasik258)
+- [branch predictors](https://github.com/kargamant/pvo_scr1/tree/bpd/scr1) - [Kuritsyn M.V.](https://github.com/mihasik258)
 
 ## Repository contents
 Folder | Description
