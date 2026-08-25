@@ -1,0 +1,11 @@
+sw/build/
+sw/doom1.wad
+sw/stub/
+doomgeneric/
+soc_backup_before_doom_*/
+*.o
+*.bin
+*.elf
+*.dump
+*.map
+*.vvp

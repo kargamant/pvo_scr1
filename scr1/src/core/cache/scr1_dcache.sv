@@ -6,7 +6,7 @@
 module scr1_dcache #(
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] CACHEABLE_ADDR_MASK    = '0,
     parameter logic [`SCR1_DMEM_AWIDTH-1:0] CACHEABLE_ADDR_PATTERN = '0,
-    parameter int unsigned                  NUM_LINES              = 64,
+    parameter int unsigned                  NUM_LINES              = 2048, // 32 KiB (2048*4*4): DOOM read working set (colormap+flats+textures) > 16 KiB
     parameter int unsigned                  LINE_WORDS             = 4
 ) (
     input  logic                              clk,

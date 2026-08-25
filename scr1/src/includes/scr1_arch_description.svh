@@ -173,7 +173,9 @@ parameter int unsigned SCR1_BP_BTB_SIZE  = 256;                      // BTB entr
 parameter int unsigned SCR1_BP_BTB_IDX_W = $clog2(SCR1_BP_BTB_SIZE); // BTB index width
 
 // IFU fetch-queue depth in 32-bit words
-parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 2;
+// q4 for DOOM: deeper fetch queue hides fetch latency (frontend-bound); pairs
+// with the L1 cache. q2->q4 was -15% CoreMark and met timing on-board.
+parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 4;
 
 // Bypasses on AXI/AHB bridge I/O
 `define SCR1_IMEM_AHB_IN_BP         // bypass instruction memory AHB bridge input register

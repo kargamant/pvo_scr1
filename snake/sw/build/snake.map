@@ -1,0 +1,372 @@
+Archive member included to satisfy reference by file (symbol)
+
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+                              build/sc_print.o (__moddi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+                              build/sc_print.o (__udivdi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+                              build/sc_print.o (__umoddi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+                              /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o) (__clz_tab)
+/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+                              build/sc_print.o (strnlen)
+
+Discarded input sections
+
+ .text          0x00000000        0x0 build/snake.o
+ .data          0x00000000        0x0 build/snake.o
+ .bss           0x00000000        0x0 build/snake.o
+ .text          0x00000000        0x0 build/sc_print.o
+ .data          0x00000000        0x0 build/sc_print.o
+ .bss           0x00000000        0x0 build/sc_print.o
+ .text.printf_putch
+                0x00000000        0x8 build/sc_print.o
+ .text          0x00000000        0x0 build/uart.o
+ .data          0x00000000        0x0 build/uart.o
+ .bss           0x00000000        0x0 build/uart.o
+ .text.sc1f_uart_init
+                0x00000000       0x4c build/uart.o
+ .text.uart_puts
+                0x00000000       0x54 build/uart.o
+ .text.uart_puthex16
+                0x00000000       0xcc build/uart.o
+ .text.uart_puthex32
+                0x00000000       0x38 build/uart.o
+ .rodata.uart_print_info.str1.4
+                0x00000000        0xf build/uart.o
+ .text.uart_print_info
+                0x00000000      0x118 build/uart.o
+ .text.uart_puthex64
+                0x00000000       0x60 build/uart.o
+ .text.uart_puthex8
+                0x00000000       0x64 build/uart.o
+ .text.uart_puthex4
+                0x00000000       0x34 build/uart.o
+ .text.uart_putdec
+                0x00000000      0x104 build/uart.o
+ .text.uart_read_hex
+                0x00000000      0x150 build/uart.o
+ .text.uart_read_str
+                0x00000000      0x10c build/uart.o
+ .text          0x00000000        0x0 build/crt-noreloc.o
+ .data          0x00000000        0x0 build/crt-noreloc.o
+ .bss           0x00000000        0x0 build/crt-noreloc.o
+ .text          0x00000000      0x450 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_info    0x00000000      0x7e8 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_abbrev  0x00000000      0x1ca /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_loclists
+                0x00000000      0x528 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_aranges
+                0x00000000       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_rnglists
+                0x00000000       0x65 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_line    0x00000000      0xa4e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_str     0x00000000      0x23d /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_line_str
+                0x00000000      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .comment       0x00000000       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .riscv.attributes
+                0x00000000       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .text          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .text          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .data          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .bss           0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+TCM              0xf0000000         0x00010000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD build/snake.o
+LOAD build/sc_print.o
+LOAD build/uart.o
+LOAD build/crt-noreloc.o
+LOAD /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a
+START GROUP
+LOAD /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a
+LOAD /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a
+END GROUP
+LOAD /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a
+                0x00000800                        STACK_SIZE = 0x800
+
+.text.crt       0xf0000000      0x504
+ FILL mask 0x00000000
+                0x00000100                        . = 0x100
+ *fill*         0xf0000000      0x100 00000000
+ *(.text.crt*)
+ .text.crt      0xf0000100      0x404 build/crt-noreloc.o
+                0xf0000200                _start
+                0xf00003c0                handle_trap
+                0xf0000504                        . = ALIGN (0x4)
+
+.text           0xf0000504     0x13c4
+                [!provide]                        PROVIDE (__TEXT_START__ = .)
+ *(.text .text.*)
+ .text.spawn_apple
+                0xf0000504       0x98 build/snake.o
+ .text.startup.main
+                0xf000059c      0x5e8 build/snake.o
+                0xf000059c                main
+ .text.vprintfmt.constprop.0
+                0xf0000b84      0x478 build/sc_print.o
+ .text.sc_printf
+                0xf0000ffc       0x44 build/sc_print.o
+                0xf0000ffc                sc_printf
+ .text.sc1f_uart_putchar
+                0xf0001040       0x50 build/uart.o
+                0xf0001040                putchar
+                0xf0001040                sc1f_uart_putchar
+ .text          0xf0001090      0x430 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+                0xf0001090                __udivdi3
+ .text          0xf00014c0      0x3e4 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+                0xf00014c0                __umoddi3
+ .text.strnlen  0xf00018a4       0x24 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+                0xf00018a4                strnlen
+                [!provide]                        PROVIDE (__TEXT_END__ = .)
+
+.rodata         0xf00018c8      0x100
+                0xf00020c8                        _gp = (. + 0x800)
+ *(.srodata.cst16)
+ *(.srodata.cst8)
+ *(.srodata.cst4)
+ *(.srodata.cst2)
+ *(.srodata*)
+ .rodata        0xf00018c8      0x100 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+                0xf00018c8                __clz_tab
+
+.rodata.main.str1.4
+                0xf00019c8       0x31
+ .rodata.main.str1.4
+                0xf00019c8       0x31 build/snake.o
+
+.rodata.vprintfmt.constprop.0.str1.4
+                0xf00019fc        0x7
+ .rodata.vprintfmt.constprop.0.str1.4
+                0xf00019fc        0x7 build/sc_print.o
+
+.rodata.vprintfmt.constprop.0
+                0xf0001a04      0x158
+ .rodata.vprintfmt.constprop.0
+                0xf0001a04      0x158 build/sc_print.o
+
+.rela.dyn       0xf0001b5c        0x0
+ .rela.text.crt
+                0xf0001b5c        0x0 build/snake.o
+
+.data           0xf0001b5c        0x0
+                [!provide]                        PROVIDE (__DATA_START__ = .)
+ *(.data .data.*)
+
+.sdata          0xf0001b5c        0x0
+ *(.sdata .sdata.* .gnu.linkonce.s.*)
+                0xf0001b5c                        . = ALIGN (0x4)
+                [!provide]                        PROVIDE (__DATA_END__ = .)
+
+.tdata          0xf0001b5c        0x0
+                [!provide]                        PROVIDE (_tls_data = .)
+                0xf0001b5c                        PROVIDE (_tdata_begin = .)
+ *(.tdata .tdata.*)
+                0xf0001b5c                        . = ALIGN (0x4)
+                0xf0001b5c                        PROVIDE (_tdata_end = .)
+
+.tbss           0xf0001b5c        0x0
+                [!provide]                        PROVIDE (_tbss_begin = .)
+ *(.tbss .tbss.*)
+                0xf0001b5c                        . = ALIGN (0x4)
+                0xf0001b5c                        PROVIDE (_tbss_end = .)
+
+.sbss           0xf0001b5c       0x28
+                0xf0001b5c                        PROVIDE (__BSS_START__ = .)
+ *(.sbss .sbss.* .gnu.linkonce.sb.*)
+ .sbss.skip_next.0
+                0xf0001b5c        0x4 build/snake.o
+ .sbss.score    0xf0001b60        0x4 build/snake.o
+ .sbss.ay       0xf0001b64        0x4 build/snake.o
+ .sbss.ax       0xf0001b68        0x4 build/snake.o
+ .sbss.dir_y    0xf0001b6c        0x4 build/snake.o
+ .sbss.dir_x    0xf0001b70        0x4 build/snake.o
+ .sbss.length   0xf0001b74        0x4 build/snake.o
+ .sbss.tail     0xf0001b78        0x4 build/snake.o
+ .sbss.head     0xf0001b7c        0x4 build/snake.o
+ .sbss.rng_state
+                0xf0001b80        0x4 build/snake.o
+ *(.scommon)
+
+.bss            0xf0001b84      0xcb0
+ *(.bss .bss.*)
+ .bss.sy        0xf0001b84      0x400 build/snake.o
+ .bss.sx        0xf0001f84      0x400 build/snake.o
+ .bss.occ       0xf0002384      0x4b0 build/snake.o
+                0xf0002834                        . = ALIGN (0x4)
+                0xf0002834                        PROVIDE (__BSS_END__ = .)
+                0xf0002834                        _end = .
+                [!provide]                        PROVIDE (__end = .)
+
+.stack          0xf000f800      0x800
+                0xf000f800                        PROVIDE (__STACK_START__ = .)
+                0xf0010000                        . = (. + STACK_SIZE)
+ *fill*         0xf000f800      0x800 
+                0xf0010000                        PROVIDE (__C_STACK_TOP__ = .)
+                [!provide]                        PROVIDE (__STACK_END__ = .)
+
+/DISCARD/
+ *(.eh_frame .eh_frame.*)
+OUTPUT(build/snake.elf elf32-littleriscv)
+
+.debug_info     0x00000000     0x3f06
+ .debug_info    0x00000000      0xa9a build/snake.o
+ .debug_info    0x00000a9a      0x784 build/sc_print.o
+ .debug_info    0x0000121e     0x1bfd build/uart.o
+ .debug_info    0x00002e1b       0x25 build/crt-noreloc.o
+ .debug_info    0x00002e40      0x761 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_info    0x000035a1      0x7b4 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_info    0x00003d55       0xd8 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_info    0x00003e2d       0xd9 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_abbrev   0x00000000      0xbaa
+ .debug_abbrev  0x00000000      0x2a4 build/snake.o
+ .debug_abbrev  0x000002a4      0x23e build/sc_print.o
+ .debug_abbrev  0x000004e2      0x26b build/uart.o
+ .debug_abbrev  0x0000074d       0x14 build/crt-noreloc.o
+ .debug_abbrev  0x00000761      0x1a6 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_abbrev  0x00000907      0x1aa /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_abbrev  0x00000ab1       0x70 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_abbrev  0x00000b21       0x89 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_loclists
+                0x00000000     0x241c
+ .debug_loclists
+                0x00000000      0x343 build/snake.o
+ .debug_loclists
+                0x00000343      0x5f7 build/sc_print.o
+ .debug_loclists
+                0x0000093a      0xdab build/uart.o
+ .debug_loclists
+                0x000016e5      0x704 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_loclists
+                0x00001de9      0x586 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_loclists
+                0x0000236f       0xad /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_aranges  0x00000000      0x168
+ .debug_aranges
+                0x00000000       0x28 build/snake.o
+ .debug_aranges
+                0x00000028       0x30 build/sc_print.o
+ .debug_aranges
+                0x00000058       0x78 build/uart.o
+ .debug_aranges
+                0x000000d0       0x20 build/crt-noreloc.o
+ .debug_aranges
+                0x000000f0       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_aranges
+                0x00000110       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_aranges
+                0x00000130       0x18 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_aranges
+                0x00000148       0x20 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_rnglists
+                0x00000000      0x967
+ .debug_rnglists
+                0x00000000      0x2a5 build/snake.o
+ .debug_rnglists
+                0x000002a5       0xc3 build/sc_print.o
+ .debug_rnglists
+                0x00000368      0x4ed build/uart.o
+ .debug_rnglists
+                0x00000855       0x99 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_rnglists
+                0x000008ee       0x66 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_rnglists
+                0x00000954       0x13 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_line     0x00000000     0x4b77
+ .debug_line    0x00000000     0x1238 build/snake.o
+ .debug_line    0x00001238      0xab5 build/sc_print.o
+ .debug_line    0x00001ced     0x1984 build/uart.o
+ .debug_line    0x00003671      0x1b3 build/crt-noreloc.o
+ .debug_line    0x00003824      0x905 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_line    0x00004129      0x963 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_line    0x00004a8c       0x3f /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_line    0x00004acb       0xac /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_str      0x00000000      0x814
+ .debug_str     0x00000000      0x814 build/snake.o
+                                0x268 (size before relaxing)
+ .debug_str     0x00000814      0x246 build/sc_print.o
+ .debug_str     0x00000814      0x325 build/uart.o
+ .debug_str     0x00000814       0x52 build/crt-noreloc.o
+ .debug_str     0x00000814      0x23e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_str     0x00000814      0x23e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_str     0x00000814      0x18b /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_str     0x00000814      0x18a /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_line_str
+                0x00000000      0x2c8
+ .debug_line_str
+                0x00000000      0x2c8 build/snake.o
+                                0x108 (size before relaxing)
+ .debug_line_str
+                0x000002c8      0x10a build/sc_print.o
+ .debug_line_str
+                0x000002c8      0x10f build/uart.o
+ .debug_line_str
+                0x000002c8       0x46 build/crt-noreloc.o
+ .debug_line_str
+                0x000002c8      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_line_str
+                0x000002c8      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_line_str
+                0x000002c8      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .debug_line_str
+                0x000002c8       0xbb /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.comment        0x00000000       0x22
+ .comment       0x00000000       0x22 build/snake.o
+                                 0x23 (size before relaxing)
+ .comment       0x00000022       0x23 build/sc_print.o
+ .comment       0x00000022       0x23 build/uart.o
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .comment       0x00000022       0x23 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.riscv.attributes
+                0x00000000       0x43
+ .riscv.attributes
+                0x00000000       0x3f build/snake.o
+ .riscv.attributes
+                0x0000003f       0x3f build/sc_print.o
+ .riscv.attributes
+                0x0000007e       0x3f build/uart.o
+ .riscv.attributes
+                0x000000bd       0x41 build/crt-noreloc.o
+ .riscv.attributes
+                0x000000fe       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .riscv.attributes
+                0x00000128       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .riscv.attributes
+                0x00000152       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .riscv.attributes
+                0x0000017c       0x2a /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+
+.debug_frame    0x00000000      0x21c
+ .debug_frame   0x00000000       0x50 build/snake.o
+ .debug_frame   0x00000050       0x90 build/sc_print.o
+ .debug_frame   0x000000e0      0x11c build/uart.o
+ .debug_frame   0x000001fc       0x20 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)

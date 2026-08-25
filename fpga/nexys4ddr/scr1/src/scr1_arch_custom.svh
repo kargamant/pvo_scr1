@@ -8,7 +8,7 @@
 // Current FPGA build identificators, can be modified
 `define SCR1_PTFM_SOC_ID            32'h21042600
 `define SCR1_PTFM_BLD_ID            32'h22011202
-`define SCR1_PTFM_CORE_CLK_FREQ     32'd30000000
+`define SCR1_PTFM_CORE_CLK_FREQ     32'd40000000
 
 `define SCR1_TRGT_FPGA_XILINX        // Uncomment if target platform is Xilinx FPGAs
 //`define SCR1_TRGT_FPGA_INTEL         // Uncomment if target platform is Intel FPGAs AND --->

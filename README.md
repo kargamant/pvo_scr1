@@ -1,5 +1,7 @@
 # Open-source SDK for SCR1 core
 
+[описание предсказателя](scr1/README.md)
+
 ## Repository contents
 Folder | Description
 ------ | -----------
