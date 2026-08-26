@@ -158,6 +158,7 @@ module scr1_pipe_exu (
     output  logic [`SCR1_XLEN-1:0]              exu2pipe_pc_curr_o,         // Current PC
     output  logic [`SCR1_XLEN-1:0]              exu2csr_pc_next_o,          // Next PC
     output  logic                               exu2ifu_pc_new_req_o,       // New PC request
+    output  logic                               exu2pipe_fencei_req_o,
     output  logic [`SCR1_XLEN-1:0]              exu2ifu_pc_new_o            // New PC data
 `ifdef SCR1_BP_RAS_EN
     ,
@@ -369,6 +370,8 @@ assign exu_queue_barrier = wfi_halted_ff | wfi_halt_req | wfi_run_start_ff
 ;
 
 assign exu_queue_en = exu2idu_rdy_o & idu2exu_req_i;
+
+assign exu2pipe_fencei_req_o = exu_queue_vd & exu_queue.fencei_req;
 
 // EXU queue valid flag register
 //------------------------------------------------------------------------------
