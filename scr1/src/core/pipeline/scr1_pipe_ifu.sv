@@ -68,21 +68,48 @@ module scr1_pipe_ifu
     output  logic                                   ifu2idu_imem_err_o,         // Instruction access fault exception
     output  logic                                   ifu2idu_err_rvi_hi_o,       // 1 - imem fault when trying to fetch second half of an unaligned RVI instruction
     output  logic                                   ifu2idu_vd_o                // IFU request
+`ifdef SCR1_BP_RAS_EN
+    ,
+    // IFU -> EXU RAS prediction
+    output  logic                                   ifu2exu_bp_ras_vd_o,        // this instr is a predicted return
+    output  logic [`SCR1_XLEN-1:0]                  ifu2exu_bp_ras_target_o     // predicted return target (RAS top)
+`endif // SCR1_BP_RAS_EN
+`ifdef SCR1_BP_DYNAMIC
+    ,
+    // IFU -> EXU: dynamic-predictor metadata carried with the instruction
+    output  logic                                   ifu2exu_bp_predicted_taken_o, // direction predicted for this instr
+    output  logic [SCR1_BP_BHT_IDX_W-1:0]           ifu2exu_bp_index_o,           // BHT index used at fetch
+    // EXU -> IFU: BHT training channel
+    input   logic                                   exu2ifu_bp_upd_vd_i,          // a conditional branch resolved
+    input   logic [SCR1_BP_BHT_IDX_W-1:0]           exu2ifu_bp_upd_index_i,       // BHT index to update
+    input   logic                                   exu2ifu_bp_upd_taken_i        // actual taken outcome
+`endif // SCR1_BP_DYNAMIC
+`ifdef SCR1_BP_BTB
+    ,
+    // EXU -> IFU: early-BTB training channel (resolved taken direct branch/jump)
+    input   logic                                   exu2ifu_bp_btb_upd_vd_i,      // train pulse
+    input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_btb_upd_pc_i,      // branch/jump PC
+    input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_btb_upd_target_i,  // resolved taken target
+    input   logic                                   exu2ifu_bp_btb_upd_safe_i,    // branch ends on word boundary
+    input   logic                                   exu2ifu_bp_btb_upd_is_cond_i  // resolved transfer is a conditional branch
+`endif // SCR1_BP_BTB
 );
 
 //------------------------------------------------------------------------------
 // Local parameters declaration
 //------------------------------------------------------------------------------
 
-localparam SCR1_IFU_Q_SIZE_WORD     = 2;
+localparam SCR1_IFU_Q_SIZE_WORD     = SCR1_IFU_QUEUE_SIZE_WORD;   // config knob (arch_description.svh)
 localparam SCR1_IFU_Q_SIZE_HALF     = SCR1_IFU_Q_SIZE_WORD * 2;
-localparam SCR1_TXN_CNT_W           = 3;
 
 localparam SCR1_IFU_QUEUE_ADR_W     = $clog2(SCR1_IFU_Q_SIZE_HALF);
 localparam SCR1_IFU_QUEUE_PTR_W     = SCR1_IFU_QUEUE_ADR_W + 1;
 
 localparam SCR1_IFU_Q_FREE_H_W      = $clog2(SCR1_IFU_Q_SIZE_HALF + 1);
 localparam SCR1_IFU_Q_FREE_W_W      = $clog2(SCR1_IFU_Q_SIZE_WORD + 1);
+
+// Transaction-counter width (must cover the free-word count)
+localparam SCR1_TXN_CNT_W           = (SCR1_IFU_Q_FREE_W_W > 3) ? SCR1_IFU_Q_FREE_W_W : 3;
 
 //------------------------------------------------------------------------------
 // Local types declaration
@@ -242,6 +269,43 @@ type_scr1_bypass_e                  instr_bypass_type;
 logic                               instr_bypass_vd;
 `endif // SCR1_NO_DEC_STAGE
 
+// Static branch predictor (BTFN) signals
+logic                               ifu_head_pc_upd;
+logic [`SCR1_XLEN-1:0]              ifu_head_pc;        // PC of the instruction at the queue output
+logic                               bp_instr_consumed;  // instruction accepted by IDU this cycle
+logic                               bp_predict_taken;   // predictor: taken
+logic [`SCR1_XLEN-1:0]              bp_predict_pc;      // predictor: target PC
+logic                               bp_redirect_req;    // predicted-taken redirect request
+logic                               bp_any_taken;       // predicted taken (branch/jump OR RAS return)
+logic [`SCR1_XLEN-1:0]              bp_any_target;      // predicted target (PC+imm OR RAS top)
+logic                               bp_is_branch;       // instr at queue output is a branch/jump (B2)
+`ifdef SCR1_BP_BTB
+logic                               q_steered [SCR1_IFU_Q_SIZE_HALF]; // per-halfword: word was BTB-steered
+// steer-flag FIFO (fetch-time steer decision, request -> response)
+localparam int unsigned SCR1_STEER_FIFO_DEPTH = 8;
+logic                               steer_fifo [SCR1_STEER_FIFO_DEPTH];
+logic                               steer_fifo_unal [SCR1_STEER_FIFO_DEPTH]; // target[1] of the steer
+logic [2:0]                         steer_fifo_wptr;
+logic [2:0]                         steer_fifo_rptr;
+`endif // SCR1_BP_BTB
+
+`ifdef SCR1_BP_RAS_EN
+// Return Address Stack signals
+logic                               ras_is_call;        // instr at queue output is a call
+logic                               ras_is_return;      // instr at queue output is a return
+logic                               ras_push;           // push return address this cycle
+logic                               ras_pop;            // pop this cycle
+logic                               ras_top_valid;      // RAS top is valid
+logic [`SCR1_XLEN-1:0]              ras_top;            // RAS top (predicted return target)
+logic [`SCR1_XLEN-1:0]              ras_link;           // return address to push (PC + instr size)
+logic                               ras_predict_vd;     // return with a valid RAS prediction
+`endif // SCR1_BP_RAS_EN
+
+// Effective New PC request seen by the IFU datapath:
+// external EXU redirect (jumps/branches/traps/...) OR predictor redirect
+logic                               pc_new_req_i2;
+logic [`SCR1_XLEN-1:0]              pc_new_i2;
+
 //------------------------------------------------------------------------------
 // Instruction queue
 //------------------------------------------------------------------------------
@@ -259,7 +323,7 @@ logic                               instr_bypass_vd;
 // New PC unaligned flag register
 //------------------------------------------------------------------------------
 
-assign new_pc_unaligned_upd = exu2ifu_pc_new_req_i | imem_resp_vd;
+assign new_pc_unaligned_upd = pc_new_req_i2 | imem_resp_vd;
 
 always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
@@ -269,9 +333,13 @@ always_ff @(posedge clk, negedge rst_n) begin
     end
 end
 
-assign new_pc_unaligned_next = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i[1]
-                             : ~imem_resp_vd        ? new_pc_unaligned_ff
-                                                    : 1'b0;
+assign new_pc_unaligned_next = pc_new_req_i2 ? pc_new_i2[1]
+                             : ~imem_resp_vd  ? new_pc_unaligned_ff
+`ifdef SCR1_BP_BTB
+                             // Steered branch word: skip the target's low half when unaligned
+                             : steer_resp      ? steer_unal_resp
+`endif // SCR1_BP_BTB
+                                              : 1'b0;
 
 // Instruction type decoder
 //------------------------------------------------------------------------------
@@ -309,7 +377,7 @@ always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
         instr_hi_rvi_lo_ff <= 1'b0;
     end else begin
-        if (exu2ifu_pc_new_req_i) begin
+        if (pc_new_req_i2) begin
             instr_hi_rvi_lo_ff <= 1'b0;
         end else if (imem_resp_vd) begin
             instr_hi_rvi_lo_ff <= instr_hi_rvi_lo_next;
@@ -378,7 +446,7 @@ assign q_wr_full   = (q_wr_size == SCR1_IFU_QUEUE_WR_FULL);
 // Write/read pointer registers
 //------------------------------------------------------------------------------
 
-assign q_flush_req = exu2ifu_pc_new_req_i | pipe2ifu_stop_fetch_i;
+assign q_flush_req = pc_new_req_i2 | pipe2ifu_stop_fetch_i;
 
 // Queue write pointer register
 assign q_wptr_upd  = q_flush_req | ~q_wr_none;
@@ -422,17 +490,27 @@ always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
         q_data  <= '{SCR1_IFU_Q_SIZE_HALF{'0}};
         q_err   <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
+`ifdef SCR1_BP_BTB
+        q_steered <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
+`endif // SCR1_BP_BTB
     end else if (q_wr_en) begin
         case (q_wr_size)
             SCR1_IFU_QUEUE_WR_HI    : begin
                 q_data[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]         <= imem_rdata_hi;
                 q_err [SCR1_IFU_QUEUE_ADR_W'(q_wptr)]         <= imem_resp_er;
+`ifdef SCR1_BP_BTB
+                q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_resp;
+`endif // SCR1_BP_BTB
             end
             SCR1_IFU_QUEUE_WR_FULL  : begin
                 q_data[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]         <= imem_rdata_lo;
                 q_err [SCR1_IFU_QUEUE_ADR_W'(q_wptr)]         <= imem_resp_er;
                 q_data[SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)]  <= imem_rdata_hi;
                 q_err [SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)]  <= imem_resp_er;
+`ifdef SCR1_BP_BTB
+                q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_resp;
+                q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)] <= steer_resp;
+`endif // SCR1_BP_BTB
             end
         endcase
     end
@@ -462,9 +540,9 @@ assign q_head_is_rvc    = ~q_head_is_rvi;
 //------------------------------------------------------------------------------
 
 // IFU FSM control signals
-assign ifu_fetch_req = exu2ifu_pc_new_req_i & ~pipe2ifu_stop_fetch_i;
+assign ifu_fetch_req = pc_new_req_i2 & ~pipe2ifu_stop_fetch_i;
 assign ifu_stop_req  = pipe2ifu_stop_fetch_i
-                     | (imem_resp_er_discard_pnd & ~exu2ifu_pc_new_req_i);
+                     | (imem_resp_er_discard_pnd & ~pc_new_req_i2);
 
 always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
@@ -515,7 +593,7 @@ assign imem_handshake_done = ifu2imem_req_o & imem2ifu_req_ack_i;
 // IMEM address register
 //------------------------------------------------------------------------------
 
-assign imem_addr_upd = imem_handshake_done | exu2ifu_pc_new_req_i;
+assign imem_addr_upd = imem_handshake_done | pc_new_req_i2;
 
 always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
@@ -526,11 +604,14 @@ always_ff @(posedge clk, negedge rst_n) begin
 end
 
 `ifndef SCR1_NEW_PC_REG
-assign imem_addr_next = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i[`SCR1_XLEN-1:2]                 + imem_handshake_done
+assign imem_addr_next = pc_new_req_i2 ? pc_new_i2[`SCR1_XLEN-1:2]                 + imem_handshake_done
+`ifdef SCR1_BP_BTB
+                      : btb_steer_req  ? btb_target_fetch[`SCR1_XLEN-1:2]        // early-BTB fetch steer
+`endif // SCR1_BP_BTB
                       : &imem_addr_ff[5:2]   ? imem_addr_ff                                     + imem_handshake_done
                                              : {imem_addr_ff[`SCR1_XLEN-1:6], imem_addr_ff[5:2] + imem_handshake_done};
 `else // SCR1_NEW_PC_REG
-assign imem_addr_next = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i[`SCR1_XLEN-1:2]
+assign imem_addr_next = pc_new_req_i2 ? pc_new_i2[`SCR1_XLEN-1:2]
                       : &imem_addr_ff[5:2]   ? imem_addr_ff                                     + imem_handshake_done
                                              : {imem_addr_ff[`SCR1_XLEN-1:6], imem_addr_ff[5:2] + imem_handshake_done};
 `endif // SCR1_NEW_PC_REG
@@ -566,7 +647,7 @@ assign imem_pnd_txns_q_full   = &imem_pnd_txns_cnt;
 // In the 2nd case, since the IMEM responce was erroneous there is no guarantee
 // that subsequent IMEM instructions would be valid.
 
-assign imem_resp_discard_cnt_upd = exu2ifu_pc_new_req_i | imem_resp_er
+assign imem_resp_discard_cnt_upd = pc_new_req_i2 | imem_resp_er
                                  | (imem_resp_ok & imem_resp_discard_req);
 
 always_ff @(posedge clk, negedge rst_n) begin
@@ -578,11 +659,11 @@ always_ff @(posedge clk, negedge rst_n) begin
 end
 
 `ifndef SCR1_NEW_PC_REG
-assign imem_resp_discard_cnt_next = exu2ifu_pc_new_req_i     ? imem_pnd_txns_cnt_next - imem_handshake_done
+assign imem_resp_discard_cnt_next = pc_new_req_i2         ? imem_pnd_txns_cnt_next - imem_handshake_done
                                   : imem_resp_er_discard_pnd ? imem_pnd_txns_cnt_next
                                                              : imem_resp_discard_cnt - 1'b1;
 `else // SCR1_NEW_PC_REG
-assign imem_resp_discard_cnt_next = exu2ifu_pc_new_req_i | imem_resp_er_discard_pnd
+assign imem_resp_discard_cnt_next = pc_new_req_i2 | imem_resp_er_discard_pnd
                                   ? imem_pnd_txns_cnt_next
                                   : imem_resp_discard_cnt - 1'b1;
 `endif // SCR1_NEW_PC_REG
@@ -594,10 +675,10 @@ assign imem_resp_discard_req = |imem_resp_discard_cnt;
 //------------------------------------------------------------------------------
 
 `ifndef SCR1_NEW_PC_REG
-assign ifu2imem_req_o  = (exu2ifu_pc_new_req_i & ~imem_pnd_txns_q_full & ~pipe2ifu_stop_fetch_i)
+assign ifu2imem_req_o  = (pc_new_req_i2 & ~imem_pnd_txns_q_full & ~pipe2ifu_stop_fetch_i)
                        | (ifu_fsm_fetch        & ~imem_pnd_txns_q_full & q_has_free_slots);
-assign ifu2imem_addr_o = exu2ifu_pc_new_req_i
-                       ? {exu2ifu_pc_new_i[`SCR1_XLEN-1:2], 2'b00}
+assign ifu2imem_addr_o = pc_new_req_i2
+                       ? {pc_new_i2[`SCR1_XLEN-1:2], 2'b00}
                        : {imem_addr_ff, 2'b00};
 `else // SCR1_NEW_PC_REG
 assign ifu2imem_req_o  = ifu_fsm_fetch & ~imem_pnd_txns_q_full & q_has_free_slots;
@@ -758,6 +839,260 @@ end
 assign ifu2hdu_pbuf_rdy_o = idu2ifu_rdy_i;
 `endif // SCR1_DBG_EN
 
+//------------------------------------------------------------------------------
+// Static branch predictor (BTFN)
+//------------------------------------------------------------------------------
+// Shadow fetch PC: PC of the instruction at the queue output; advances one
+// instruction at a time and resets on any redirect.
+
+assign bp_instr_consumed = ifu2idu_vd_o & idu2ifu_rdy_i;
+assign ifu_head_pc_upd   = exu2ifu_pc_new_req_i | bp_redirect_req | bp_instr_consumed;
+
+always_ff @(posedge clk, negedge rst_n) begin
+    if (~rst_n) begin
+        ifu_head_pc <= '0;
+    end else if (ifu_head_pc_upd) begin
+        ifu_head_pc <= exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i
+`ifdef SCR1_BP_BTB
+                     : bp_redirect_req       ? (bp_steer_misfetch ? bp_seq_pc : bp_any_target)
+                     : bp_steer_commit       ? bp_predict_pc     // steered-taken: target already queued, no flush
+                                             : bp_seq_pc;
+`else // SCR1_BP_BTB
+                     : bp_redirect_req       ? bp_any_target
+                                             : ifu_head_pc + (q_head_is_rvc ? `SCR1_XLEN'd2 : `SCR1_XLEN'd4);
+`endif // SCR1_BP_BTB
+    end
+end
+
+`ifdef SCR1_BP_DYNAMIC
+//------------------------------------------------------------------------------
+// Branch History Table
+//------------------------------------------------------------------------------
+// Read by the shadow PC; trained from the EXU->IFU channel
+logic                              bht_valid;
+logic                              bht_taken;
+
+scr1_pipe_bht #(
+    .SCR1_BHT_SIZE  (SCR1_BP_BHT_SIZE ),
+    .SCR1_BHT_IDX_W (SCR1_BP_BHT_IDX_W)
+) i_bht (
+    .clk             (clk                             ),
+    .rst_n           (rst_n                           ),
+    .bht_rindex_i    (ifu_head_pc[SCR1_BP_BHT_IDX_W:1]),
+    .bht_valid_o     (bht_valid                       ),
+    .bht_taken_o     (bht_taken                       ),
+`ifdef SCR1_BP_BTB
+    .bht_rindex2_i   (btb_bht_index_fetch             ),  // fetch-side gate: BTB-stored branch index
+    .bht_valid2_o    (btb_bht_valid_fetch             ),
+    .bht_taken2_o    (btb_bht_taken_fetch             ),
+`else // SCR1_BP_BTB
+    .bht_rindex2_i   ('0                              ),
+    .bht_valid2_o    (                                ),
+    .bht_taken2_o    (                                ),
+`endif // SCR1_BP_BTB
+    .bht_upd_vd_i    (exu2ifu_bp_upd_vd_i             ),
+    .bht_upd_index_i (exu2ifu_bp_upd_index_i          ),
+    .bht_upd_taken_i (exu2ifu_bp_upd_taken_i          )
+);
+`endif // SCR1_BP_DYNAMIC
+
+`ifdef SCR1_BP_BTB
+//------------------------------------------------------------------------------
+// Early Branch Target Buffer
+//------------------------------------------------------------------------------
+// Trained from the EXU on resolved taken direct branches/jumps; read at the fetch address
+logic                              btb_hit_fetch;      // BTB hit for the word being fetched
+logic [`SCR1_XLEN-1:0]             btb_target_fetch;   // its cached taken target
+logic                              btb_safe_fetch;     // cached branch ends on word boundary
+logic                              btb_is_cond_fetch;  // cached entry is a conditional branch
+logic [SCR1_BP_BHT_IDX_W-1:0]      btb_bht_index_fetch; // cached branch's BHT index
+logic                              btb_bht_valid_fetch; // fetch-side BHT read (at the cached index)
+logic                              btb_bht_taken_fetch;
+
+scr1_pipe_btb #(
+    .SCR1_BTB_SIZE  (SCR1_BP_BTB_SIZE ),
+    .SCR1_BTB_IDX_W (SCR1_BP_BTB_IDX_W)
+) i_btb (
+    .clk              (clk                         ),
+    .rst_n            (rst_n                       ),
+    .btb_query_pc_i   ({imem_addr_ff, 2'b00}       ),  // read at the fetch address (early)
+    .btb_hit_o        (btb_hit_fetch               ),
+    .btb_target_o     (btb_target_fetch            ),
+    .btb_safe_o       (btb_safe_fetch              ),
+    .btb_is_cond_o    (btb_is_cond_fetch           ),
+    .btb_bht_index_o  (btb_bht_index_fetch         ),
+    .btb_upd_vd_i     (exu2ifu_bp_btb_upd_vd_i     ),
+    .btb_upd_pc_i     (exu2ifu_bp_btb_upd_pc_i     ),
+    .btb_upd_target_i (exu2ifu_bp_btb_upd_target_i ),
+    .btb_upd_safe_i   (exu2ifu_bp_btb_upd_safe_i   ),
+    .btb_upd_is_cond_i(exu2ifu_bp_btb_upd_is_cond_i)
+);
+
+// Early-BTB fetch steer: on a BTB hit, steer only the NEXT fetch address (no flush)
+logic                              btb_steer_req;      // steer the next fetch this cycle
+// Steer only safe branches; gate the direction by the BHT (jumps always steer,
+// conditional branches only when the BHT counter is trained-and-taken)
+logic btb_dir_ok;
+assign btb_dir_ok = ~btb_is_cond_fetch | (btb_bht_valid_fetch & btb_bht_taken_fetch);
+assign btb_steer_req = btb_hit_fetch & btb_safe_fetch & btb_dir_ok
+                     & imem_handshake_done & ifu_fsm_fetch
+                     & ~pc_new_req_i2;                 // an architectural redirect wins
+
+// Steer flag rides a FIFO from request to response, marking q_steered
+logic                              steer_resp;         // steer flag for the response being written
+logic                              steer_unal_resp;    // steer target[1] for the response being written
+logic                              q_steered_head;     // head instruction belongs to a steered word
+// ends-on-word-boundary: consumed branch ends at a word boundary
+logic                              bp_ends_on_word;
+logic                              bp_steer_hit;       // a safe BTB-steered branch is at the queue output
+logic                              bp_steer_commit;    // ... predictor agrees taken -> no flush
+logic                              bp_steer_misfetch;  // ... predictor says not-taken -> flush to seq
+logic [`SCR1_XLEN-1:0]             bp_seq_pc;          // sequential fall-through PC
+assign bp_ends_on_word    = ~(ifu_head_pc[1] ^ q_head_is_rvc);
+assign bp_steer_hit       = q_steered_head & bp_ends_on_word & bp_is_branch & bp_instr_consumed;
+assign bp_steer_commit    = bp_steer_hit &  bp_predict_taken;
+assign bp_steer_misfetch  = bp_steer_hit & ~bp_predict_taken;
+assign bp_seq_pc          = ifu_head_pc + (q_head_is_rvc ? `SCR1_XLEN'd2 : `SCR1_XLEN'd4);
+
+// steer-flag FIFO: push on request handshake, pop on response
+assign steer_resp      = steer_fifo[steer_fifo_rptr];
+assign steer_unal_resp = steer_fifo_unal[steer_fifo_rptr];
+
+always_ff @(posedge clk, negedge rst_n) begin
+    if (~rst_n) begin
+        steer_fifo_wptr <= '0;
+        steer_fifo_rptr <= '0;
+    end else begin
+        if (imem_handshake_done) begin
+            steer_fifo[steer_fifo_wptr]      <= btb_steer_req;
+            steer_fifo_unal[steer_fifo_wptr] <= btb_target_fetch[1]; // target alignment for the word AFTER this one
+            steer_fifo_wptr                  <= steer_fifo_wptr + 1'b1;
+        end
+        if (imem_resp_received) begin
+            steer_fifo_rptr <= steer_fifo_rptr + 1'b1;
+        end
+    end
+end
+
+// Head steer flag, aligned with q_data_head / q_err_head
+assign q_steered_head = q_steered[SCR1_IFU_QUEUE_ADR_W'(q_rptr)];
+`endif // SCR1_BP_BTB
+
+// Static predictor: direction + PC+imm target
+scr1_pipe_bpred #(
+    .SCR1_BP_PREDICT_BRANCHES (1'b1),   // predict conditional branches
+    .SCR1_BP_PREDICT_RVC      (1'b1)    // predict compressed jumps/branches
+) i_bpred (
+    .clk                (clk               ),
+    .rst_n              (rst_n             ),
+    .bp_instr_i         (ifu2idu_instr_o   ),
+    .bp_pc_i            (ifu_head_pc       ),
+    .bp_vd_i            (ifu2idu_vd_o & ~ifu2idu_imem_err_o),
+    .bp_predict_taken_o (bp_predict_taken  ),
+    .bp_predict_pc_o    (bp_predict_pc     ),
+    .bp_is_branch_o     (bp_is_branch      )
+`ifdef SCR1_BP_DYNAMIC
+    ,
+    .bp_bht_valid_i     (bht_valid         ),
+    .bp_bht_taken_i     (bht_taken         )
+`endif // SCR1_BP_DYNAMIC
+);
+
+`ifdef SCR1_BP_RAS_EN
+//------------------------------------------------------------------------------
+// Return Address Stack: call/return detection + return-target prediction
+//------------------------------------------------------------------------------
+// Detect call/return per RISC-V ABI (link registers x1/x5); RVI and RVC
+logic [`SCR1_IMEM_DWIDTH-1:0]       ras_instr;
+logic                              ras_rd_link;
+logic                              ras_rs1_link;
+logic                              rvi_jal;
+logic                              rvi_jalr;
+logic                              rvc_jr;
+logic                              rvc_jalr;
+logic                              rvc_jal;
+logic                              rvc_jr_link;
+
+assign ras_instr    = ifu2idu_instr_o;
+assign ras_rd_link  = (ras_instr[11:7]  == 5'd1) | (ras_instr[11:7]  == 5'd5);
+assign ras_rs1_link = (ras_instr[19:15] == 5'd1) | (ras_instr[19:15] == 5'd5);
+assign rvi_jal      = (ras_instr[6:0] == 7'b1101111);
+assign rvi_jalr     = (ras_instr[6:0] == 7'b1100111);
+// RVC (quadrant C2, funct3=100): c.jr (bit12=0), c.jalr (bit12=1), rs2 field == 0
+assign rvc_jr       = (ras_instr[1:0]==2'b10) & (ras_instr[15:13]==3'b100)
+                    & (ras_instr[12]==1'b0)   & (ras_instr[11:7]!=5'd0) & (ras_instr[6:2]==5'd0);
+assign rvc_jalr     = (ras_instr[1:0]==2'b10) & (ras_instr[15:13]==3'b100)
+                    & (ras_instr[12]==1'b1)   & (ras_instr[11:7]!=5'd0) & (ras_instr[6:2]==5'd0);
+assign rvc_jal      = (ras_instr[1:0]==2'b01) & (ras_instr[15:13]==3'b001);  // c.jal (RV32)
+assign rvc_jr_link  = (ras_instr[11:7] == 5'd1) | (ras_instr[11:7] == 5'd5);
+
+assign ras_is_call   = (rvi_jal  & ras_rd_link)
+                     | (rvi_jalr & ras_rd_link)
+                     | rvc_jalr | rvc_jal;
+assign ras_is_return = (rvi_jalr & ras_rs1_link & ~ras_rd_link)
+                     | (rvc_jr   & rvc_jr_link);
+
+assign ras_predict_vd = ras_is_return & ras_top_valid;
+assign ras_link       = ifu_head_pc + (q_head_is_rvc ? `SCR1_XLEN'd2 : `SCR1_XLEN'd4);
+assign ras_push       = ras_is_call   & bp_instr_consumed & ~exu2ifu_pc_new_req_i;
+assign ras_pop        = ras_is_return & ras_top_valid & bp_instr_consumed & ~exu2ifu_pc_new_req_i;
+
+scr1_pipe_ras #(
+    .SCR1_RAS_DEPTH (SCR1_RAS_DEPTH)
+) i_ras (
+    .clk         (clk                  ),
+    .rst_n       (rst_n                ),
+    .ras_flush_i (1'b0                 ),   // never flush (EXU verifies the target)
+    .ras_push_i  (ras_push             ),
+    .ras_pop_i   (ras_pop              ),
+    .ras_data_i  (ras_link             ),
+    .ras_valid_o (ras_top_valid        ),
+    .ras_data_o  (ras_top              )
+);
+
+// Carry the return prediction to EXU
+assign ifu2exu_bp_ras_vd_o     = ras_predict_vd;
+assign ifu2exu_bp_ras_target_o = ras_top;
+
+// Combined prediction: branch/jump (PC+imm) OR return (RAS top)
+assign bp_any_taken  = bp_predict_taken | ras_predict_vd;
+assign bp_any_target = ras_predict_vd ? ras_top : bp_predict_pc;
+`else // SCR1_BP_RAS_EN
+assign bp_any_taken  = bp_predict_taken;
+assign bp_any_target = bp_predict_pc;
+`endif // SCR1_BP_RAS_EN
+
+// Redirect fetch on a predicted-taken instruction (EXU redirect wins)
+`ifdef SCR1_BP_BTB
+// Flush on a non-steered taken redirect, or a steer misfetch (committed steer needs none)
+assign bp_redirect_req = bp_instr_consumed & ~exu2ifu_pc_new_req_i
+                       & ( (bp_any_taken & ~bp_steer_commit) | bp_steer_misfetch );
+`elsif SCR1_BPRED_EN
+assign bp_redirect_req = bp_any_taken & bp_instr_consumed & ~exu2ifu_pc_new_req_i;
+`else // SCR1_BPRED_EN
+assign bp_redirect_req = 1'b0;   // predictor disabled
+`endif // SCR1_BP_BTB
+
+// Effective New PC request/value for the IFU datapath (EXU redirect wins)
+assign pc_new_req_i2 = exu2ifu_pc_new_req_i | bp_redirect_req;
+`ifdef SCR1_BP_BTB
+// steer-misfetch redirects to the sequential fall-through
+assign pc_new_i2     = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i
+                     : bp_steer_misfetch     ? bp_seq_pc
+                                             : bp_any_target;
+`else // SCR1_BP_BTB
+assign pc_new_i2     = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i : bp_any_target;
+`endif // SCR1_BP_BTB
+
+`ifdef SCR1_BP_DYNAMIC
+//------------------------------------------------------------------------------
+// Dynamic branch predictor
+//------------------------------------------------------------------------------
+// Carry the predicted direction and the BHT index (shadow-PC[.:1]) to EXU
+assign ifu2exu_bp_predicted_taken_o = bp_predict_taken;
+assign ifu2exu_bp_index_o           = ifu_head_pc[SCR1_BP_BHT_IDX_W:1];
+`endif // SCR1_BP_DYNAMIC
+
 `ifdef SCR1_TRGT_SIMULATION
 
 //------------------------------------------------------------------------------
@@ -797,14 +1132,14 @@ SCR1_SVA_IFU_QUEUE_OVF : assert property (
 
 SCR1_SVA_IFU_IMEM_ERR_BEH : assert property (
     @(negedge clk) disable iff (~rst_n)
-    (imem_resp_er & ~imem_resp_discard_req & ~exu2ifu_pc_new_req_i) |=>
+    (imem_resp_er & ~imem_resp_discard_req & ~pc_new_req_i2) |=>
     (ifu_fsm_curr == SCR1_IFU_FSM_IDLE) & (imem_resp_discard_cnt == imem_pnd_txns_cnt)
     ) else $error("IFU Error: incorrect behavior after memory error");
 
 SCR1_SVA_IFU_NEW_PC_REQ_BEH : assert property (
     @(negedge clk) disable iff (~rst_n)
-    exu2ifu_pc_new_req_i |=> q_is_empty
-    ) else $error("IFU Error: incorrect behavior after exu2ifu_pc_new_req_i");
+    pc_new_req_i2 |=> q_is_empty
+    ) else $error("IFU Error: incorrect behavior after pc_new_req_i2");
 
 SCR1_SVA_IFU_IMEM_ADDR_ALIGNED : assert property (
     @(negedge clk) disable iff (~rst_n)
