@@ -16,6 +16,10 @@ DDR_LD  := ddr.ld
 BUILD   := build
 incs    := -I. -I$(COMMON)
 defs    := -DSYS_CLK=$(SYS_CLK) -DUART_BAUDRATE=115200 -DRTC_HZ=1000000
+# DOOM_FPS=1 -> print averaged frames/sec to UART once per second ([FPS] xx.x)
+ifeq ($(DOOM_FPS),1)
+defs    += -DDOOM_FPS
+endif
 
 CFLAGS  := -O2 -g --specs=picolibc.specs -march=$(MARCH) -mabi=$(MABI) \
            -Wa,-march=$(MARCH) -ffreestanding -ffunction-sections -fdata-sections \

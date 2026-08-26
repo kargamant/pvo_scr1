@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 940 430" role="img" aria-label="Схема тактовых доменов" xmlns="http://www.w3.org/2000/svg" width="940" height="430">
+<style>
+.box{fill:#f8fafb;stroke:#3d4954;stroke-width:1.4}
+.box-cpu{fill:#d7e0ee;stroke:#2b4b7a;stroke-width:1.6}
+.box-mem{fill:#dbe7d2;stroke:#4a6b3a;stroke-width:1.6}
+.box-doom{fill:#f0d7dd;stroke:#a8324a;stroke-width:1.6}
+.box-snake{fill:#f0e2c4;stroke:#9a6a00;stroke-width:1.6}
+.box-acc{fill:#d3e7ea;stroke:#0e6f7e;stroke-width:1.6}
+.lbl{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-weight:650}
+.lbl-s{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+.mono{fill:#3d4954;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace}
+.mono-i{fill:#141a21;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace;font-weight:600}
+.wire{stroke:#3d4954;stroke-width:1.5;fill:none}
+.wire-doom{stroke:#a8324a;stroke-width:2;fill:none}
+.wire-snake{stroke:#9a6a00;stroke-width:2;fill:none}
+.wire-acc{stroke:#0e6f7e;stroke-width:2;fill:none}
+.tick{stroke:#3d4954;stroke-width:1.3;fill:none}
+</style>
+<rect x="0" y="0" width="940" height="430" fill="#eef1f4"/>
+
+  <!-- osc -->
+  <rect class="box" x="20" y="185" width="110" height="54" rx="9"/>
+  <text class="lbl-s" x="75" y="207" text-anchor="middle" font-size="11.5">кварц (E3)</text>
+  <text class="mono" x="75" y="224" text-anchor="middle" font-size="10.5">100 МГц</text>
+  <!-- mmcm -->
+  <rect class="box-acc" x="165" y="140" width="120" height="150" rx="10"/>
+  <text class="lbl" x="225" y="208" text-anchor="middle" font-size="13">MMCM</text>
+  <text class="mono" x="225" y="226" text-anchor="middle" font-size="10">clk_wiz</text>
+  <path class="wire" d="M130 212 H165"/>
+
+  <!-- domain: core/AXI 40 -->
+  <rect class="box-cpu" x="470" y="30" width="450" height="96" rx="11"/>
+  <text class="lbl" x="490" y="55" font-size="13">Домен ядра / AXI · 40 МГц</text>
+  <text class="mono" x="490" y="76" font-size="10.5">SCR1 + I$/D$ · SmartConnect · регистры AXI4-Lite</text>
+  <text class="mono" x="490" y="93" font-size="10.5">(UART, vga, ps2_kbd, порт записи vga_fb)</text>
+  <text class="mono" x="490" y="112" font-size="10.5" style="fill:#2b4b7a">clk_out1 (CLKOUT0)</text>
+
+  <!-- domain: pixel 25 -->
+  <rect class="box-acc" x="470" y="150" width="290" height="96" rx="11"/>
+  <text class="lbl" x="490" y="175" font-size="13">Пиксельный домен · 25 МГц</text>
+  <text class="mono" x="490" y="196" font-size="10.5">vga_timing · чтение фреймбуфера</text>
+  <text class="mono" x="490" y="213" font-size="10.5">→ VGA-пины (R/G/B, HS, VS)</text>
+  <text class="mono" x="490" y="232" font-size="10.5" style="fill:#0e6f7e">clk_out4</text>
+
+  <!-- domain: MIG/DDR -->
+  <rect class="box-mem" x="470" y="270" width="450" height="120" rx="11"/>
+  <text class="lbl" x="490" y="295" font-size="13">Домен MIG / DDR2</text>
+  <text class="mono" x="490" y="316" font-size="10.5">контроллер DDR2 · собственный ui_clk</text>
+  <text class="mono" x="490" y="333" font-size="10.5">AXI-порт к памяти (код + WAD + куча)</text>
+  <text class="mono" x="490" y="352" font-size="10.5" style="fill:#4a6b3a">clk_out2 = 100 (sys) · clk_out3 = 200 (ref/IDELAY)</text>
+
+  <!-- output wires from MMCM -->
+  <path d="M285 175 H400 V78 H470" style="stroke:#2b4b7a;stroke-width:2;fill:none"/>
+  <text class="mono-i" x="340" y="170" font-size="10">40 МГц</text>
+  <path d="M285 200 H420 V198 H470" style="stroke:#0e6f7e;stroke-width:2;fill:none"/>
+  <text class="mono-i" x="340" y="215" font-size="10">25 МГц</text>
+  <path d="M285 250 H400 V330 H470" style="stroke:#4a6b3a;stroke-width:2;fill:none"/>
+  <text class="mono-i" x="330" y="290" font-size="10">100 / 200 МГц</text>
+
+  <!-- CDC bridges -->
+  <rect x="520" y="128" width="200" height="20" rx="10" style="fill:#f8fafb;stroke:#3d4954;stroke-dasharray:4 3"/>
+  <text class="mono" x="620" y="142" text-anchor="middle" font-size="9.5">CDC: двухпортовая BRAM</text>
+  <path d="M600 126 V150" style="stroke:#3d4954;stroke-width:1.3;stroke-dasharray:3 3;fill:none"/>
+
+  <rect x="700" y="248" width="200" height="20" rx="10" style="fill:#f8fafb;stroke:#3d4954;stroke-dasharray:4 3"/>
+  <text class="mono" x="800" y="262" text-anchor="middle" font-size="9.5">CDC: AXI clock-converter</text>
+  <path d="M800 126 V248" style="stroke:#3d4954;stroke-width:1.3;stroke-dasharray:3 3;fill:none"/>
+</svg>

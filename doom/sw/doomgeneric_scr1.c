@@ -14,6 +14,9 @@
 #include "doom_hw.h"
 #include "doomgeneric.h"
 #include "doomkeys.h"
+#ifdef DOOM_FPS
+#include <stdio.h>          // printf -> UART (via picolibc stdout = dg_putc)
+#endif
 
 #ifndef SYS_CLK
 #define SYS_CLK 30000000u
@@ -69,6 +72,20 @@ void SCR1_SetPaletteEntry(int idx, unsigned char r, unsigned char g, unsigned ch
 // Call from I_FinishUpdate(): `screen` is the 320x200 8bpp buffer (screens[0]).
 void SCR1_FinishUpdate(const uint8_t *screen) {
     fb_blit8(screen);
+#ifdef DOOM_FPS
+    // Frame counter -> UART: once ~1 s of cycles elapse, print averaged FPS
+    // (one decimal). rdcycle is 32-bit; unsigned diff is wrap-safe over 1 s.
+    static uint32_t frames = 0, t0 = 0; static int init = 0;
+    uint32_t now = rdcycle();
+    if (!init) { t0 = now; init = 1; }
+    frames++;
+    uint32_t dt = now - t0;
+    if (dt >= SYS_CLK) {                                     // ~1 second window
+        uint32_t fps10 = (uint32_t)(((uint64_t)frames * 10u * SYS_CLK) / dt);
+        printf("[FPS] %u.%u\n", (unsigned)(fps10 / 10u), (unsigned)(fps10 % 10u));
+        frames = 0; t0 = now;
+    }
+#endif
 }
 
 // ---------------------------------------------------------------- keyboard ---

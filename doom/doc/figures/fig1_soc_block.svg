@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 940 470" role="img" aria-label="Блок-схема SoC" xmlns="http://www.w3.org/2000/svg" width="940" height="470">
+<style>
+.box{fill:#f8fafb;stroke:#3d4954;stroke-width:1.4}
+.box-cpu{fill:#d7e0ee;stroke:#2b4b7a;stroke-width:1.6}
+.box-mem{fill:#dbe7d2;stroke:#4a6b3a;stroke-width:1.6}
+.box-doom{fill:#f0d7dd;stroke:#a8324a;stroke-width:1.6}
+.box-snake{fill:#f0e2c4;stroke:#9a6a00;stroke-width:1.6}
+.box-acc{fill:#d3e7ea;stroke:#0e6f7e;stroke-width:1.6}
+.lbl{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-weight:650}
+.lbl-s{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+.mono{fill:#3d4954;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace}
+.mono-i{fill:#141a21;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace;font-weight:600}
+.wire{stroke:#3d4954;stroke-width:1.5;fill:none}
+.wire-doom{stroke:#a8324a;stroke-width:2;fill:none}
+.wire-snake{stroke:#9a6a00;stroke-width:2;fill:none}
+.wire-acc{stroke:#0e6f7e;stroke-width:2;fill:none}
+.tick{stroke:#3d4954;stroke-width:1.3;fill:none}
+</style>
+<rect x="0" y="0" width="940" height="470" fill="#eef1f4"/>
+
+  <!-- CPU + caches -->
+  <rect class="box-cpu" x="30" y="150" width="150" height="120" rx="10"/>
+  <text class="lbl" x="105" y="180" text-anchor="middle" font-size="16">SCR1 core</text>
+  <text class="mono" x="105" y="200" text-anchor="middle" font-size="11">rv32imc · 40 МГц</text>
+  <rect class="box-mem" x="46" y="212" width="55" height="44" rx="6"/>
+  <text class="mono-i" x="73.5" y="231" text-anchor="middle" font-size="11">I$</text>
+  <text class="mono" x="73.5" y="247" text-anchor="middle" font-size="10">16К</text>
+  <rect class="box-mem" x="109" y="212" width="55" height="44" rx="6"/>
+  <text class="mono-i" x="136.5" y="231" text-anchor="middle" font-size="11">D$</text>
+  <text class="mono" x="136.5" y="247" text-anchor="middle" font-size="10">32К</text>
+
+  <!-- AXI split labels -->
+  <path class="wire-acc" d="M180 200 H250"/>
+  <path class="wire" d="M180 235 H250 M180 235 V200" style="opacity:.0"/>
+  <text class="mono-i" x="215" y="192" text-anchor="middle" font-size="10.5">AXI4</text>
+  <text class="mono" x="215" y="214" text-anchor="middle" font-size="9.5">(кэш→DDR)</text>
+
+  <!-- Interconnect -->
+  <rect class="box-acc" x="250" y="70" width="120" height="330" rx="10"/>
+  <text class="lbl" x="310" y="230" text-anchor="middle" font-size="14" transform="rotate(-90 310 230)">AXI SmartConnect</text>
+  <text class="mono" x="310" y="392" text-anchor="middle" font-size="10">9 masters</text>
+
+  <!-- DDR (cached) -->
+  <rect class="box-mem" x="440" y="150" width="150" height="70" rx="10"/>
+  <text class="lbl" x="515" y="180" text-anchor="middle" font-size="14">DDR2 (MIG)</text>
+  <text class="mono" x="515" y="199" text-anchor="middle" font-size="10.5">128 МБ · 0x0000_0000</text>
+  <path class="wire-acc" d="M370 185 H440"/>
+  <text class="tag cache" x="405" y="176" text-anchor="middle" font-size="10" style="font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace">cached</text>
+
+  <!-- peripherals column -->
+  <g font-size="11">
+    <rect class="box" x="440" y="40" width="150" height="40" rx="8"/>
+    <text class="lbl-s" x="452" y="58" font-size="12">UART</text><text class="mono" x="578" y="65" text-anchor="end">0xFF01</text>
+    <rect class="box-snake" x="640" y="40" width="270" height="40" rx="8"/>
+    <text class="lbl-s" x="652" y="58" font-size="12">vga (тайлы, Snake)</text><text class="mono" x="898" y="65" text-anchor="end">0xFF02</text>
+
+    <rect class="box" x="440" y="250" width="150" height="40" rx="8"/>
+    <text class="lbl-s" x="452" y="268" font-size="12">ps2_kbd</text><text class="mono" x="578" y="275" text-anchor="end">0xFF03</text>
+    <rect class="box-doom" x="640" y="250" width="270" height="40" rx="8"/>
+    <text class="lbl-s" x="652" y="268" font-size="12">vga_fb (кадр, DOOM)</text><text class="mono" x="898" y="275" text-anchor="end">0xFF04</text>
+    <rect class="box-doom" x="640" y="300" width="270" height="40" rx="8"/>
+    <text class="lbl-s" x="652" y="318" font-size="12">палитра DOOM</text><text class="mono" x="898" y="325" text-anchor="end">0xFF05</text>
+  </g>
+  <path class="wire" d="M370 60 H440"/>
+  <path class="wire-snake" d="M590 60 H640"/>
+  <path class="wire" d="M370 270 H440"/>
+  <path class="wire-doom" d="M590 270 H640"/>
+  <path class="wire-doom" d="M370 300 Q400 300 400 320 T440 320 H620 Q640 320 640 320" style="opacity:0"/>
+  <path class="wire-doom" d="M370 320 H640"/>
+  <text class="mono" x="405" y="44" text-anchor="middle" font-size="9.5">AXI4-Lite</text>
+
+  <!-- clock -->
+  <rect class="box" x="30" y="360" width="150" height="70" rx="10"/>
+  <text class="lbl" x="105" y="385" text-anchor="middle" font-size="13">clk_wiz (MMCM)</text>
+  <text class="mono" x="105" y="403" text-anchor="middle" font-size="10">40 МГц → ядро</text>
+  <text class="mono" x="105" y="418" text-anchor="middle" font-size="10">25 МГц → пиксель</text>
+  <path class="wire" d="M105 360 V300 H250" stroke-dasharray="4 3"/>
+</svg>

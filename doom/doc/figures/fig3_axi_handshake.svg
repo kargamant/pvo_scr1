@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 900 250" role="img" aria-label="Диаграмма записи AXI4-Lite" xmlns="http://www.w3.org/2000/svg" width="900" height="250">
+<style>
+.box{fill:#f8fafb;stroke:#3d4954;stroke-width:1.4}
+.box-cpu{fill:#d7e0ee;stroke:#2b4b7a;stroke-width:1.6}
+.box-mem{fill:#dbe7d2;stroke:#4a6b3a;stroke-width:1.6}
+.box-doom{fill:#f0d7dd;stroke:#a8324a;stroke-width:1.6}
+.box-snake{fill:#f0e2c4;stroke:#9a6a00;stroke-width:1.6}
+.box-acc{fill:#d3e7ea;stroke:#0e6f7e;stroke-width:1.6}
+.lbl{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-weight:650}
+.lbl-s{fill:#141a21;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
+.mono{fill:#3d4954;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace}
+.mono-i{fill:#141a21;font-family:ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace;font-weight:600}
+.wire{stroke:#3d4954;stroke-width:1.5;fill:none}
+.wire-doom{stroke:#a8324a;stroke-width:2;fill:none}
+.wire-snake{stroke:#9a6a00;stroke-width:2;fill:none}
+.wire-acc{stroke:#0e6f7e;stroke-width:2;fill:none}
+.tick{stroke:#3d4954;stroke-width:1.3;fill:none}
+</style>
+<rect x="0" y="0" width="900" height="250" fill="#eef1f4"/>
+
+  <!-- lanes -->
+  <g font-family="ui-monospace,'SF Mono','JetBrains Mono',Consolas,monospace" font-size="12">
+    <text class="mono-i" x="8" y="44">AWVALID</text>
+    <text class="mono-i" x="8" y="94">WVALID</text>
+    <text class="mono-i" x="8" y="144">AWREADY/WREADY</text>
+    <text class="mono-i" x="8" y="194">BVALID</text>
+  </g>
+  <!-- grid ticks -->
+  <g class="tick" stroke-dasharray="2 5" opacity=".5">
+    <path d="M160 20 V220"/><path d="M300 20 V220"/><path d="M440 20 V220"/>
+    <path d="M580 20 V220"/><path d="M720 20 V220"/>
+  </g>
+  <!-- AWVALID: high from t1 -->
+  <path class="wire-acc" d="M160 50 V30 H720 V50"/>
+  <!-- WVALID -->
+  <path class="wire-acc" d="M160 100 V80 H720 V100"/>
+  <!-- READY: single pulse at t3 (registered) -->
+  <path class="wire-doom" d="M160 150 H300 V130 H440 V150 H720"/>
+  <text class="mono" x="370" y="125" text-anchor="middle" font-size="10.5">1 такт</text>
+  <!-- BVALID after -->
+  <path class="wire" d="M160 200 H440 V180 H580 V200 H720"/>
+  <!-- annotations -->
+  <text class="mono" x="230" y="240" text-anchor="middle" font-size="11">оба valid ↑</text>
+  <text class="mono" x="370" y="240" text-anchor="middle" font-size="11">FSM: защёлкнуть addr+data,</text>
+  <text class="mono" x="370" y="253" text-anchor="middle" font-size="11" opacity="0"> </text>
+  <text class="mono" x="510" y="240" text-anchor="middle" font-size="11">выдать ответ B</text>
+</svg>
