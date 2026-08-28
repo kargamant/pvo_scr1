@@ -97,6 +97,19 @@ D-cache обслуживает load hit локально. Каждый store о�
 
 Массивы data и tag не сбрасываются, reset очищает только valid-биты и состояние FSM. 
 
+## Мониторинг производительности
+
+В I-cache и D-cache предусмотрены 32-битные счётчики запросов, hit/miss, refill,
+ожидания памяти, bypass, ошибок, а также задержек промахов и write-through stores.
+Они включаются директивой `SCR1_CACHE_PERF_COUNTERS`; для наблюдения через
+`ila_icache_perf` и `ila_dcache_perf` нужно дополнительно включить
+`SCR1_DEBUG_ILA` в `scr1_arch_custom.svh`. Счётчики обнуляются по `rst_n` и
+переполняются по модулю $2^{32}$.
+
+Основные метрики: `hit_rate = hits / (hits + misses)` и
+`average_miss_penalty = miss_cycles / misses`. Поскольку кэши расположены после
+роутеров, обращения к TCM и timer в статистику кэшей не входят.
+
 ## Ограничения
 
 - один запрос одновременно;
