@@ -78,6 +78,33 @@ module scr1_icache #(
     logic                         req_hit;
     logic [`SCR1_IMEM_AWIDTH-1:0] fill_addr;
 
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    logic                         perf_req_event;
+    logic                         perf_lookup_event;
+    logic                         perf_hit_event;
+    logic                         perf_miss_event;
+    logic                         perf_bypass_event;
+    logic                         perf_refill_word_event;
+    logic                         perf_refill_done_event;
+    logic                         perf_mem_req_wait_event;
+    logic                         perf_mem_resp_wait_event;
+    logic                         perf_error_event;
+    logic                         perf_invalidate_event;
+    logic                         perf_miss_active_q;
+
+    logic [31:0]                  perf_req_count_q;
+    logic [31:0]                  perf_hit_count_q;
+    logic [31:0]                  perf_miss_count_q;
+    logic [31:0]                  perf_bypass_count_q;
+    logic [31:0]                  perf_refill_word_count_q;
+    logic [31:0]                  perf_refill_count_q;
+    logic [31:0]                  perf_miss_cycles_q;
+    logic [31:0]                  perf_mem_req_wait_q;
+    logic [31:0]                  perf_mem_resp_wait_q;
+    logic [31:0]                  perf_error_count_q;
+    logic [31:0]                  perf_invalidate_count_q;
+`endif // SCR1_CACHE_PERF_COUNTERS
+
     integer line;
 
     initial begin
@@ -106,6 +133,39 @@ module scr1_icache #(
     assign cpu_addr_cacheable = (cpu_addr_i & CACHEABLE_ADDR_MASK) == CACHEABLE_ADDR_PATTERN;
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
+
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    // All event signals are single-cycle pulses. Counting the LOOKUP decision,
+    // rather than IC_RESP_OK, keeps hits separate from completed refills.
+    assign perf_req_event = (state_q == IC_IDLE)
+                          && cpu_req_i && cpu_req_ack_o;
+    assign perf_lookup_event = (state_q == IC_LOOKUP)
+                             && (req_cmd_q == SCR1_MEM_CMD_RD)
+                             && req_cacheable;
+    assign perf_hit_event  = perf_lookup_event && req_hit;
+    assign perf_miss_event = perf_lookup_event && !req_hit;
+    assign perf_bypass_event = perf_req_event && !cpu_addr_cacheable;
+
+    assign perf_refill_word_event = (state_q == IC_FILL_WAIT)
+                                  && (mem_resp_i == SCR1_MEM_RESP_RDY_OK);
+    assign perf_refill_done_event = perf_refill_word_event
+                                  && (fill_word_q
+                                      == WORD_INDEX_BITS'(LINE_WORDS - 1));
+
+    assign perf_mem_req_wait_event = ((state_q == IC_IDLE)
+                                      && !invalidate_i && cpu_req_i
+                                      && !cpu_addr_cacheable
+                                      && !mem_req_ack_i)
+                                   || (((state_q == IC_FILL_REQ)
+                                        || (state_q == IC_BYPASS_REQ))
+                                       && !mem_req_ack_i);
+    assign perf_mem_resp_wait_event = (((state_q == IC_FILL_WAIT)
+                                        || (state_q == IC_BYPASS_WAIT))
+                                       && (mem_resp_i
+                                           == SCR1_MEM_RESP_NOTRDY));
+    assign perf_error_event = (cpu_resp_o == SCR1_MEM_RESP_RDY_ER);
+    assign perf_invalidate_event = (state_q == IC_IDLE) && invalidate_i;
+`endif // SCR1_CACHE_PERF_COUNTERS
 
     always_comb begin
         fill_addr = req_addr_q;
@@ -305,5 +365,84 @@ module scr1_icache #(
             end
         end
     end
+
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    // The counters intentionally wrap at 2^32. perf_miss_cycles_q measures the
+    // processor-visible interval from a cacheable miss to the cache response.
+    always_ff @(posedge clk, negedge rst_n) begin
+        if (!rst_n) begin
+            perf_miss_active_q     <= 1'b0;
+            perf_req_count_q       <= '0;
+            perf_hit_count_q       <= '0;
+            perf_miss_count_q      <= '0;
+            perf_bypass_count_q    <= '0;
+            perf_refill_word_count_q <= '0;
+            perf_refill_count_q    <= '0;
+            perf_miss_cycles_q     <= '0;
+            perf_mem_req_wait_q    <= '0;
+            perf_mem_resp_wait_q   <= '0;
+            perf_error_count_q     <= '0;
+            perf_invalidate_count_q <= '0;
+        end else begin
+            if (perf_req_event) begin
+                perf_req_count_q <= perf_req_count_q + 1'b1;
+            end
+            if (perf_hit_event) begin
+                perf_hit_count_q <= perf_hit_count_q + 1'b1;
+            end
+            if (perf_miss_event) begin
+                perf_miss_count_q  <= perf_miss_count_q + 1'b1;
+                perf_miss_active_q <= 1'b1;
+            end
+            if (perf_bypass_event) begin
+                perf_bypass_count_q <= perf_bypass_count_q + 1'b1;
+            end
+            if (perf_refill_word_event) begin
+                perf_refill_word_count_q <= perf_refill_word_count_q + 1'b1;
+            end
+            if (perf_refill_done_event) begin
+                perf_refill_count_q <= perf_refill_count_q + 1'b1;
+            end
+            if (perf_miss_active_q) begin
+                perf_miss_cycles_q <= perf_miss_cycles_q + 1'b1;
+            end
+            if (perf_mem_req_wait_event) begin
+                perf_mem_req_wait_q <= perf_mem_req_wait_q + 1'b1;
+            end
+            if (perf_mem_resp_wait_event) begin
+                perf_mem_resp_wait_q <= perf_mem_resp_wait_q + 1'b1;
+            end
+            if (perf_error_event) begin
+                perf_error_count_q <= perf_error_count_q + 1'b1;
+            end
+            if (perf_invalidate_event) begin
+                perf_invalidate_count_q <= perf_invalidate_count_q + 1'b1;
+            end
+
+            if (perf_miss_active_q
+                && ((cpu_resp_o == SCR1_MEM_RESP_RDY_OK)
+                    || (cpu_resp_o == SCR1_MEM_RESP_RDY_ER))) begin
+                perf_miss_active_q <= 1'b0;
+            end
+        end
+    end
+
+`ifdef SCR1_DEBUG_ILA
+    ila_icache_perf i_icache_perf_ila (
+        .clk     (clk),
+        .probe0  (perf_req_count_q),
+        .probe1  (perf_hit_count_q),
+        .probe2  (perf_miss_count_q),
+        .probe3  (perf_bypass_count_q),
+        .probe4  (perf_refill_word_count_q),
+        .probe5  (perf_refill_count_q),
+        .probe6  (perf_miss_cycles_q),
+        .probe7  (perf_mem_req_wait_q),
+        .probe8  (perf_mem_resp_wait_q),
+        .probe9  (perf_error_count_q),
+        .probe10 (perf_invalidate_count_q)
+    );
+`endif // SCR1_DEBUG_ILA
+`endif // SCR1_CACHE_PERF_COUNTERS
 
 endmodule
