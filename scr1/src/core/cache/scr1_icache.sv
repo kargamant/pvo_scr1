@@ -65,6 +65,7 @@ module scr1_icache #(
     type_scr1_mem_cmd_e           req_cmd_q;
     logic [WORD_INDEX_BITS-1:0]   fill_word_q;
     logic [`SCR1_IMEM_DWIDTH-1:0] response_data_q;
+    logic                         critical_word_captured;
 
     logic [LINE_INDEX_BITS-1:0]   req_line_index;
     logic [WORD_INDEX_BITS-1:0]   req_word_index;
@@ -211,10 +212,13 @@ module scr1_icache #(
 
             IC_FILL_WAIT: begin
                 if (mem_resp_i == SCR1_MEM_RESP_RDY_ER) begin
-                    state_d = IC_RESP_ERR;
+                    state_d = critical_word_captured ? IC_IDLE : IC_RESP_ERR;
                 end else if (mem_resp_i == SCR1_MEM_RESP_RDY_OK) begin
-                    if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                    if ((fill_word_q == req_word_index) &&
+                            !critical_word_captured) begin
                         state_d = IC_RESP_OK;
+                    end else if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                        state_d = critical_word_captured ? IC_IDLE : IC_RESP_OK;
                     end else begin
                         state_d = IC_FILL_REQ;
                     end
@@ -236,7 +240,11 @@ module scr1_icache #(
 
             IC_RESP_OK,
             IC_RESP_ERR: begin
-                state_d = IC_IDLE;
+                if (critical_word_captured && !valid_q[req_line_index]) begin
+                    state_d = IC_FILL_REQ;
+                end else begin
+                    state_d = IC_IDLE;
+                end
             end
 
             IC_INVALIDATE: begin
@@ -327,6 +335,7 @@ module scr1_icache #(
             req_cmd_q      <= SCR1_MEM_CMD_RD;
             fill_word_q    <= '0;
             response_data_q <= '0;
+            critical_word_captured <= '0;
         end else begin
             state_q <= state_d;
 
@@ -338,6 +347,7 @@ module scr1_icache #(
             if ((state_q == IC_LOOKUP) && req_cacheable && !req_hit) begin
                 fill_word_q            <= '0;
                 valid_q[req_line_index] <= 1'b0;
+                critical_word_captured <= '0; 
             end
 
             if ((state_q == IC_LOOKUP) && req_cacheable && req_hit
@@ -346,13 +356,21 @@ module scr1_icache #(
             end
 
             if ((state_q == IC_FILL_WAIT)
+                    && (mem_resp_i == SCR1_MEM_RESP_RDY_ER)
+                    && critical_word_captured) begin
+                    critical_word_captured <= 1'b0;
+            end
+
+            if ((state_q == IC_FILL_WAIT)
                 && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
                 if (fill_word_q == req_word_index) begin
                     response_data_q <= mem_rdata_i;
+                    critical_word_captured <= 1'b1;
                 end
 
                 if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
                     valid_q[req_line_index]   <= 1'b1;
+                    critical_word_captured <= '0;
                 end else begin
                     fill_word_q <= fill_word_q + 1'b1;
                 end
