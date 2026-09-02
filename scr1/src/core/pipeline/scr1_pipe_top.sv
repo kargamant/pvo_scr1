@@ -156,7 +156,15 @@ logic [`SCR1_XLEN-1:0]                       exu2ifu_bp_btb_upd_pc;      // BTB 
 logic [`SCR1_XLEN-1:0]                       exu2ifu_bp_btb_upd_target;  // BTB training target
 logic                                       exu2ifu_bp_btb_upd_safe;    // BTB training safe-to-steer bit
 logic                                       exu2ifu_bp_btb_upd_is_cond; // BTB training conditional-branch bit
+logic                                       exu2ifu_bp_btb_upd_rvclo;   // BTB training rvc_low bit
 `endif // SCR1_BP_BTB
+`ifdef SCR1_BP_IBTB
+logic                                       ifu2exu_bp_ibtb_vd;         // I-BTB predicted an indirect target
+logic [`SCR1_XLEN-1:0]                       ifu2exu_bp_ibtb_target;     // I-BTB predicted target
+logic                                       exu2ifu_bp_ibtb_upd_vd;     // I-BTB training valid
+logic [`SCR1_XLEN-1:0]                       exu2ifu_bp_ibtb_upd_pc;     // I-BTB training call-site PC
+logic [`SCR1_XLEN-1:0]                       exu2ifu_bp_ibtb_upd_target; // I-BTB training target
+`endif // SCR1_BP_IBTB
 
 // IDU <-> EXU
 logic                                       idu2exu_req;            // IDU request
@@ -369,8 +377,17 @@ scr1_pipe_ifu i_pipe_ifu (
     .exu2ifu_bp_btb_upd_pc_i      (exu2ifu_bp_btb_upd_pc     ),
     .exu2ifu_bp_btb_upd_target_i  (exu2ifu_bp_btb_upd_target ),
     .exu2ifu_bp_btb_upd_safe_i    (exu2ifu_bp_btb_upd_safe   ),
-    .exu2ifu_bp_btb_upd_is_cond_i (exu2ifu_bp_btb_upd_is_cond)
+    .exu2ifu_bp_btb_upd_is_cond_i (exu2ifu_bp_btb_upd_is_cond),
+    .exu2ifu_bp_btb_upd_rvclo_i   (exu2ifu_bp_btb_upd_rvclo  )
 `endif // SCR1_BP_BTB
+`ifdef SCR1_BP_IBTB
+    ,
+    .ifu2exu_bp_ibtb_vd_o         (ifu2exu_bp_ibtb_vd        ),
+    .ifu2exu_bp_ibtb_target_o     (ifu2exu_bp_ibtb_target    ),
+    .exu2ifu_bp_ibtb_upd_vd_i     (exu2ifu_bp_ibtb_upd_vd    ),
+    .exu2ifu_bp_ibtb_upd_pc_i     (exu2ifu_bp_ibtb_upd_pc    ),
+    .exu2ifu_bp_ibtb_upd_target_i (exu2ifu_bp_ibtb_upd_target)
+`endif // SCR1_BP_IBTB
 );
 
 //-------------------------------------------------------------------------------
@@ -527,8 +544,17 @@ scr1_pipe_exu i_pipe_exu (
     .exu2ifu_bp_btb_upd_pc_o        (exu2ifu_bp_btb_upd_pc     ),
     .exu2ifu_bp_btb_upd_target_o    (exu2ifu_bp_btb_upd_target ),
     .exu2ifu_bp_btb_upd_safe_o      (exu2ifu_bp_btb_upd_safe   ),
-    .exu2ifu_bp_btb_upd_is_cond_o   (exu2ifu_bp_btb_upd_is_cond)
+    .exu2ifu_bp_btb_upd_is_cond_o   (exu2ifu_bp_btb_upd_is_cond),
+    .exu2ifu_bp_btb_upd_rvclo_o     (exu2ifu_bp_btb_upd_rvclo  )
 `endif // SCR1_BP_BTB
+`ifdef SCR1_BP_IBTB
+    ,
+    .ifu2exu_bp_ibtb_vd_i           (ifu2exu_bp_ibtb_vd        ),
+    .ifu2exu_bp_ibtb_target_i       (ifu2exu_bp_ibtb_target    ),
+    .exu2ifu_bp_ibtb_upd_vd_o       (exu2ifu_bp_ibtb_upd_vd    ),
+    .exu2ifu_bp_ibtb_upd_pc_o       (exu2ifu_bp_ibtb_upd_pc    ),
+    .exu2ifu_bp_ibtb_upd_target_o   (exu2ifu_bp_ibtb_upd_target)
+`endif // SCR1_BP_IBTB
 );
 
 //-------------------------------------------------------------------------------

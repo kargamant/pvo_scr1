@@ -91,8 +91,19 @@ module scr1_pipe_ifu
     input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_btb_upd_pc_i,      // branch/jump PC
     input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_btb_upd_target_i,  // resolved taken target
     input   logic                                   exu2ifu_bp_btb_upd_safe_i,    // branch ends on word boundary
-    input   logic                                   exu2ifu_bp_btb_upd_is_cond_i  // resolved transfer is a conditional branch
+    input   logic                                   exu2ifu_bp_btb_upd_is_cond_i, // resolved transfer is a conditional branch
+    input   logic                                   exu2ifu_bp_btb_upd_rvclo_i    // branch is an RVC in the low half
 `endif // SCR1_BP_BTB
+`ifdef SCR1_BP_IBTB
+    ,
+    // IFU -> EXU: indirect-BTB prediction carried for verification
+    output  logic                                   ifu2exu_bp_ibtb_vd_o,         // head predicted an indirect target
+    output  logic [`SCR1_XLEN-1:0]                  ifu2exu_bp_ibtb_target_o,     // predicted indirect target
+    // EXU -> IFU: indirect-BTB training channel (resolved indirect jump)
+    input   logic                                   exu2ifu_bp_ibtb_upd_vd_i,     // train pulse
+    input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_ibtb_upd_pc_i,     // call-site PC
+    input   logic [`SCR1_XLEN-1:0]                  exu2ifu_bp_ibtb_upd_target_i  // resolved target
+`endif // SCR1_BP_IBTB
 );
 
 //------------------------------------------------------------------------------
@@ -276,17 +287,39 @@ logic                               bp_instr_consumed;  // instruction accepted 
 logic                               bp_predict_taken;   // predictor: taken
 logic [`SCR1_XLEN-1:0]              bp_predict_pc;      // predictor: target PC
 logic                               bp_redirect_req;    // predicted-taken redirect request
-logic                               bp_any_taken;       // predicted taken (branch/jump OR RAS return)
-logic [`SCR1_XLEN-1:0]              bp_any_target;      // predicted target (PC+imm OR RAS top)
+logic                               bp_any_taken;       // predicted taken (branch/jump OR RAS return OR I-BTB)
+logic [`SCR1_XLEN-1:0]              bp_any_target;      // predicted target (PC+imm OR RAS top OR I-BTB)
 logic                               bp_is_branch;       // instr at queue output is a branch/jump (B2)
+logic                               ibtb_predict_vd;    // head is a non-return indirect jump with an I-BTB hit
+logic [`SCR1_XLEN-1:0]              ibtb_target;        // I-BTB cached target
 `ifdef SCR1_BP_BTB
 logic                               q_steered [SCR1_IFU_Q_SIZE_HALF]; // per-halfword: word was BTB-steered
+logic                               q_steered_rvclo [SCR1_IFU_Q_SIZE_HALF]; // ... and the steer was for a rvc_low branch
 // steer-flag FIFO (fetch-time steer decision, request -> response)
 localparam int unsigned SCR1_STEER_FIFO_DEPTH = 8;
 logic                               steer_fifo [SCR1_STEER_FIFO_DEPTH];
 logic                               steer_fifo_unal [SCR1_STEER_FIFO_DEPTH]; // target[1] of the steer
+logic                               steer_fifo_rvclo [SCR1_STEER_FIFO_DEPTH]; // steer was for a rvc_low branch
 logic [2:0]                         steer_fifo_wptr;
 logic [2:0]                         steer_fifo_rptr;
+// --- rvi_unaligned (straddle) early steer (Phase-2, see bpred_doc/06_rvi_predecode.md) ---
+// Shared wrappers referenced by queue/steer datapath; tied off when RVIUN is disabled.
+logic                               straddle_pend_ff;      // a straddle redirect is armed for the next handshake
+logic                               btb_straddle_arm;      // arm the delayed (steer-after-next) redirect this handshake
+logic                               steer_straddle_resp;   // steer-FIFO straddle flag for the response being written
+logic                               bp_straddle_pos;       // head is the steered straddle branch (RVI at pc[1]==1)
+logic                               bp_straddle_squash;    // straddle commit: skip co-resident fall-through half (+3)
+logic                               straddle_tgt_unal_resp; // response marks the straddle target word landing on an odd half
+`ifdef SCR1_BP_RVIUN
+logic                               q_steered_straddle [SCR1_IFU_Q_SIZE_HALF]; // per-hword: word steered for a straddle branch
+logic                               steer_fifo_straddle [SCR1_STEER_FIFO_DEPTH];
+logic                               steer_fifo_straddle_tgt_unal [SCR1_STEER_FIFO_DEPTH]; // target[1] rides to the N+1 slot
+logic                               q_steered_straddle_head;
+logic                               btb_straddle_steerable; // class predicate: rvi_unaligned
+logic                               straddle_apply;         // the handshake that consumes the pending redirect (N+1)
+logic [`SCR1_XLEN-1:2]             straddle_pend_tgt_ff;    // pending straddle target (word address)
+logic                              straddle_pend_unal_ff;   // ... and its odd-half flag (target[1])
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
 
 `ifdef SCR1_BP_RAS_EN
@@ -336,8 +369,13 @@ end
 assign new_pc_unaligned_next = pc_new_req_i2 ? pc_new_i2[1]
                              : ~imem_resp_vd  ? new_pc_unaligned_ff
 `ifdef SCR1_BP_BTB
-                             // Steered branch word: skip the target's low half when unaligned
-                             : steer_resp      ? steer_unal_resp
+                             // Steered branch word: skip the target's low half when unaligned.
+                             // rvclo rides steer_fifo_rvclo (not the main steer flag), so
+                             // trigger on either; both carry target[1] in steer_fifo_unal.
+                             : (steer_resp | steer_rvclo_resp) ? steer_unal_resp
+                             // Straddle: the N+1 response carries the target's odd-half flag,
+                             // marking the following (target) word unaligned.
+                             : straddle_tgt_unal_resp ? 1'b1
 `endif // SCR1_BP_BTB
                                               : 1'b0;
 
@@ -474,8 +512,22 @@ always_ff @(posedge clk, negedge rst_n) begin
     end
 end
 
+// rvc_low steer-commit skips the co-resident upper half: advance by a full word.
+// straddle (rvi_unaligned) commit additionally skips the co-resident fall-through
+// half of word N+1: advance by three half-words (RVI branch +2, squash +1).
+logic q_rd_squash;   // rvc_low   : RVC head, +1 -> +2
+logic q_rd_squash3;  // straddle  : RVI head, +2 -> +3
+`ifdef SCR1_BP_BTB
+assign q_rd_squash  = bp_rvclo_squash;
+assign q_rd_squash3 = bp_straddle_squash;
+`else // SCR1_BP_BTB
+assign q_rd_squash  = 1'b0;
+assign q_rd_squash3 = 1'b0;
+`endif // SCR1_BP_BTB
 assign q_rptr_next = q_flush_req ? '0
-                   : ~q_rd_none  ? q_rptr + (q_rd_hword ? SCR1_IFU_QUEUE_PTR_W'('b001) : SCR1_IFU_QUEUE_PTR_W'('b010))
+                   : ~q_rd_none  ? q_rptr + ( q_rd_squash3                ? SCR1_IFU_QUEUE_PTR_W'('b011)
+                                            : (q_rd_hword & ~q_rd_squash) ? SCR1_IFU_QUEUE_PTR_W'('b001)
+                                                                          : SCR1_IFU_QUEUE_PTR_W'('b010))
                                  : q_rptr;
 
 // Queue data and error flag registers
@@ -492,6 +544,10 @@ always_ff @(posedge clk, negedge rst_n) begin
         q_err   <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
 `ifdef SCR1_BP_BTB
         q_steered <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
+        q_steered_rvclo <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
+`ifdef SCR1_BP_RVIUN
+        q_steered_straddle <= '{SCR1_IFU_Q_SIZE_HALF{1'b0}};
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
     end else if (q_wr_en) begin
         case (q_wr_size)
@@ -500,6 +556,10 @@ always_ff @(posedge clk, negedge rst_n) begin
                 q_err [SCR1_IFU_QUEUE_ADR_W'(q_wptr)]         <= imem_resp_er;
 `ifdef SCR1_BP_BTB
                 q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_resp;
+                q_steered_rvclo[SCR1_IFU_QUEUE_ADR_W'(q_wptr)] <= steer_rvclo_resp;
+`ifdef SCR1_BP_RVIUN
+                q_steered_straddle[SCR1_IFU_QUEUE_ADR_W'(q_wptr)] <= steer_straddle_resp;
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
             end
             SCR1_IFU_QUEUE_WR_FULL  : begin
@@ -510,6 +570,12 @@ always_ff @(posedge clk, negedge rst_n) begin
 `ifdef SCR1_BP_BTB
                 q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_resp;
                 q_steered[SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)] <= steer_resp;
+                q_steered_rvclo[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_rvclo_resp;
+                q_steered_rvclo[SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)] <= steer_rvclo_resp;
+`ifdef SCR1_BP_RVIUN
+                q_steered_straddle[SCR1_IFU_QUEUE_ADR_W'(q_wptr)]      <= steer_straddle_resp;
+                q_steered_straddle[SCR1_IFU_QUEUE_ADR_W'(q_wptr + 1'b1)] <= steer_straddle_resp;
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
             end
         endcase
@@ -603,10 +669,36 @@ always_ff @(posedge clk, negedge rst_n) begin
     end
 end
 
+`ifdef SCR1_BP_RVCLO
+// Fetch-side entry-alignment: the half of the word `imem_addr_ff` is entered at.
+// This is the missing fetch-side pc[1] (new_pc_unaligned is its decode-side twin),
+// computed from the SAME address mux as imem_addr_next. Used to suppress the rvclo
+// early-steer when we enter a word at its high half (its low-half branch is skipped),
+// which is the standard "compare branch-slot offset to the unaligned fetch PC"
+// technique for variable-length ISAs. Sequential fetch always enters the low half.
+logic entered_high_ff;
+logic entered_high_next;
+assign entered_high_next = pc_new_req_i2   ? pc_new_i2[1]
+`ifdef SCR1_BP_BTB
+                         : btb_steer_req    ? btb_target_fetch[1]
+`ifdef SCR1_BP_RVIUN
+                         : straddle_pend_ff ? straddle_pend_unal_ff
+`endif // SCR1_BP_RVIUN
+`endif // SCR1_BP_BTB
+                                            : 1'b0; // sequential -> low half
+always_ff @(posedge clk, negedge rst_n) begin
+    if (~rst_n)                entered_high_ff <= 1'b0;
+    else if (imem_addr_upd)    entered_high_ff <= entered_high_next;
+end
+`endif // SCR1_BP_RVCLO
+
 `ifndef SCR1_NEW_PC_REG
 assign imem_addr_next = pc_new_req_i2 ? pc_new_i2[`SCR1_XLEN-1:2]                 + imem_handshake_done
 `ifdef SCR1_BP_BTB
-                      : btb_steer_req  ? btb_target_fetch[`SCR1_XLEN-1:2]        // early-BTB fetch steer
+                      : btb_steer_req  ? btb_target_fetch[`SCR1_XLEN-1:2]        // early-BTB fetch steer (safe/rvclo)
+`ifdef SCR1_BP_RVIUN
+                      : straddle_pend_ff ? straddle_pend_tgt_ff                  // delayed straddle steer (after N+1)
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
                       : &imem_addr_ff[5:2]   ? imem_addr_ff                                     + imem_handshake_done
                                              : {imem_addr_ff[`SCR1_XLEN-1:6], imem_addr_ff[5:2] + imem_handshake_done};
@@ -872,17 +964,33 @@ end
 logic                              bht_valid;
 logic                              bht_taken;
 
+// gshare global history: index the BHT by (PC XOR GHR)
+logic [SCR1_BP_BHT_IDX_W-1:0]      gshare_hash;
+`ifdef SCR1_BP_GSHARE
+logic [SCR1_BP_GHR_W-1:0]          ghr_ff;
+always_ff @(posedge clk, negedge rst_n) begin
+    if (~rst_n) begin
+        ghr_ff <= '0;
+    end else if (exu2ifu_bp_upd_vd_i) begin
+        ghr_ff <= {ghr_ff[SCR1_BP_GHR_W-2:0], exu2ifu_bp_upd_taken_i};
+    end
+end
+assign gshare_hash = {{(SCR1_BP_BHT_IDX_W-SCR1_BP_GHR_W){1'b0}}, ghr_ff};
+`else // SCR1_BP_GSHARE
+assign gshare_hash = '0;
+`endif // SCR1_BP_GSHARE
+
 scr1_pipe_bht #(
     .SCR1_BHT_SIZE  (SCR1_BP_BHT_SIZE ),
     .SCR1_BHT_IDX_W (SCR1_BP_BHT_IDX_W)
 ) i_bht (
     .clk             (clk                             ),
     .rst_n           (rst_n                           ),
-    .bht_rindex_i    (ifu_head_pc[SCR1_BP_BHT_IDX_W:1]),
+    .bht_rindex_i    (ifu_head_pc[SCR1_BP_BHT_IDX_W:1] ^ gshare_hash),
     .bht_valid_o     (bht_valid                       ),
     .bht_taken_o     (bht_taken                       ),
 `ifdef SCR1_BP_BTB
-    .bht_rindex2_i   (btb_bht_index_fetch             ),  // fetch-side gate: BTB-stored branch index
+    .bht_rindex2_i   (btb_bht_index_fetch ^ gshare_hash),  // fetch-side gate: BTB-stored branch index
     .bht_valid2_o    (btb_bht_valid_fetch             ),
     .bht_taken2_o    (btb_bht_taken_fetch             ),
 `else // SCR1_BP_BTB
@@ -905,6 +1013,7 @@ logic                              btb_hit_fetch;      // BTB hit for the word b
 logic [`SCR1_XLEN-1:0]             btb_target_fetch;   // its cached taken target
 logic                              btb_safe_fetch;     // cached branch ends on word boundary
 logic                              btb_is_cond_fetch;  // cached entry is a conditional branch
+logic                              btb_rvclo_fetch;    // cached branch is rvc_low (RVC in low half)
 logic [SCR1_BP_BHT_IDX_W-1:0]      btb_bht_index_fetch; // cached branch's BHT index
 logic                              btb_bht_valid_fetch; // fetch-side BHT read (at the cached index)
 logic                              btb_bht_taken_fetch;
@@ -920,12 +1029,14 @@ scr1_pipe_btb #(
     .btb_target_o     (btb_target_fetch            ),
     .btb_safe_o       (btb_safe_fetch              ),
     .btb_is_cond_o    (btb_is_cond_fetch           ),
+    .btb_rvclo_o      (btb_rvclo_fetch             ),
     .btb_bht_index_o  (btb_bht_index_fetch         ),
     .btb_upd_vd_i     (exu2ifu_bp_btb_upd_vd_i     ),
     .btb_upd_pc_i     (exu2ifu_bp_btb_upd_pc_i     ),
     .btb_upd_target_i (exu2ifu_bp_btb_upd_target_i ),
     .btb_upd_safe_i   (exu2ifu_bp_btb_upd_safe_i   ),
-    .btb_upd_is_cond_i(exu2ifu_bp_btb_upd_is_cond_i)
+    .btb_upd_is_cond_i(exu2ifu_bp_btb_upd_is_cond_i),
+    .btb_upd_rvclo_i  (exu2ifu_bp_btb_upd_rvclo_i  )
 );
 
 // Early-BTB fetch steer: on a BTB hit, steer only the NEXT fetch address (no flush)
@@ -934,29 +1045,114 @@ logic                              btb_steer_req;      // steer the next fetch t
 // conditional branches only when the BHT counter is trained-and-taken)
 logic btb_dir_ok;
 assign btb_dir_ok = ~btb_is_cond_fetch | (btb_bht_valid_fetch & btb_bht_taken_fetch);
-assign btb_steer_req = btb_hit_fetch & btb_safe_fetch & btb_dir_ok
+logic btb_steerable;
+`ifdef SCR1_BP_RVCLO
+// Whole rvc_low class. Conditional branches gated by the fetch-side BHT (btb_dir_ok);
+// a head-side not-taken becomes a bp_steer_misfetch flush. Unaligned targets handled
+// via steer_fifo_unal riding target[1] into new_pc_unaligned (the +2 squash is
+// alignment-agnostic). rvclo does NOT set the main steer flag (see steer_fifo push).
+// Whole rvc_low class, but ONLY when we are entering this word at its LOW half
+// (~entered_high_ff): if we entered at the high half, the rvc_low branch in the low
+// half is being skipped, so steering on it is spurious (the re-hit that shelved this
+// before). Conditional branches gated by the BHT (btb_dir_ok); unaligned targets via
+// steer_fifo_unal -> new_pc_unaligned. rvclo never sets the main steer flag.
+assign btb_steerable = btb_safe_fetch | (btb_rvclo_fetch & ~entered_high_ff);
+`else
+assign btb_steerable = btb_safe_fetch;
+`endif
+assign btb_steer_req = btb_hit_fetch & btb_steerable & btb_dir_ok
                      & imem_handshake_done & ifu_fsm_fetch
-                     & ~pc_new_req_i2;                 // an architectural redirect wins
+                     & ~pc_new_req_i2                  // an architectural redirect wins
+                     & ~straddle_pend_ff;              // a pending straddle redirect wins the next handshake
+
+`ifdef SCR1_BP_RVIUN
+// rvi_unaligned (straddle) early steer, delayed by one handshake (steer-after-next):
+// word N+1 carries the branch's high half, so it must still be fetched; the redirect
+// to the target is applied at the NEXT handshake via straddle_pend_ff. The steer FIFO
+// flag is pushed on word N (the branch word) so commit lands at the branch head.
+// Subset: the whole rvi_unaligned class. Conditional branches are gated by the
+// fetch-side BHT via btb_dir_ok (below); a head-side not-taken becomes a
+// bp_steer_misfetch flush, like conditional safe steers. Unaligned targets are
+// handled: target[1] rides steer_fifo_straddle_tgt_unal to the N+1 response and
+// sets new_pc_unaligned for the target word (which is then written WR_HI), so the
+// +3 squash lands on the target's real half regardless of alignment.
+assign btb_straddle_steerable = ~btb_safe_fetch & ~btb_rvclo_fetch;         // rvi_unaligned class
+assign btb_straddle_arm = btb_hit_fetch & btb_straddle_steerable & btb_dir_ok
+                        & imem_handshake_done & ifu_fsm_fetch
+                        & ~pc_new_req_i2 & ~straddle_pend_ff;
+// the handshake that consumes the pending redirect = the N+1 fetch (target next).
+assign straddle_apply = straddle_pend_ff & imem_handshake_done & ~pc_new_req_i2;
+
+always_ff @(posedge clk, negedge rst_n) begin
+    if (~rst_n) begin
+        straddle_pend_ff      <= 1'b0;
+        straddle_pend_tgt_ff  <= '0;
+        straddle_pend_unal_ff <= 1'b0;
+    end else if (pc_new_req_i2) begin
+        straddle_pend_ff      <= 1'b0;            // any architectural/predictor redirect clears the pend
+    end else if (btb_straddle_arm) begin
+        straddle_pend_ff      <= 1'b1;            // arm at word N handshake (imem_addr advances to N+1)
+        straddle_pend_tgt_ff  <= btb_target_fetch[`SCR1_XLEN-1:2];
+        straddle_pend_unal_ff <= btb_target_fetch[1];
+    end else if (imem_handshake_done) begin
+        straddle_pend_ff      <= 1'b0;            // consumed at the next handshake (N+1 -> target)
+    end
+end
+`else // SCR1_BP_RVIUN
+assign straddle_pend_ff = 1'b0;
+assign btb_straddle_arm = 1'b0;
+`endif // SCR1_BP_RVIUN
 
 // Steer flag rides a FIFO from request to response, marking q_steered
 logic                              steer_resp;         // steer flag for the response being written
 logic                              steer_unal_resp;    // steer target[1] for the response being written
+logic                              steer_rvclo_resp;   // the steer being written was for a rvc_low branch
 logic                              q_steered_head;     // head instruction belongs to a steered word
+logic                              q_steered_rvclo_head; // ... and the steer was for a rvc_low branch
 // ends-on-word-boundary: consumed branch ends at a word boundary
 logic                              bp_ends_on_word;
-logic                              bp_steer_hit;       // a safe BTB-steered branch is at the queue output
+logic                              bp_rvclo_pos;       // head is an RVC branch in the low half (rvc_low)
+logic                              bp_steer_hit;       // a BTB-steered branch is at the queue output
 logic                              bp_steer_commit;    // ... predictor agrees taken -> no flush
 logic                              bp_steer_misfetch;  // ... predictor says not-taken -> flush to seq
+logic                              bp_rvclo_squash;    // rvc_low commit: skip the co-resident upper half
 logic [`SCR1_XLEN-1:0]             bp_seq_pc;          // sequential fall-through PC
 assign bp_ends_on_word    = ~(ifu_head_pc[1] ^ q_head_is_rvc);
-assign bp_steer_hit       = q_steered_head & bp_ends_on_word & bp_is_branch & bp_instr_consumed;
+// rvc_low steer commits only when THIS word was steered for its low-half branch
+// (so the queued target matches the head branch's target); position alone is not
+// enough - a word steered for its upper-half branch also marks the low half.
+`ifdef SCR1_BP_RVCLO
+assign bp_rvclo_pos       = q_steered_rvclo_head & q_head_is_rvc & ~ifu_head_pc[1];
+`else
+assign bp_rvclo_pos       = 1'b0;
+`endif
+// straddle commits only when THIS word was steered for its rvi_unaligned branch and
+// the head is that RVI branch on the odd half (bp_ends_on_word is 0 here, so the safe
+// term never double-counts it).
+`ifdef SCR1_BP_RVIUN
+assign bp_straddle_pos    = q_steered_straddle_head & q_head_is_rvi & ifu_head_pc[1];
+`else
+assign bp_straddle_pos    = 1'b0;
+`endif
+assign bp_steer_hit       = ( (q_steered_head & bp_ends_on_word) | bp_rvclo_pos | bp_straddle_pos )
+                          & bp_is_branch & bp_instr_consumed;
 assign bp_steer_commit    = bp_steer_hit &  bp_predict_taken;
 assign bp_steer_misfetch  = bp_steer_hit & ~bp_predict_taken;
+assign bp_rvclo_squash    = bp_steer_commit & bp_rvclo_pos;
+assign bp_straddle_squash = bp_steer_commit & bp_straddle_pos;
 assign bp_seq_pc          = ifu_head_pc + (q_head_is_rvc ? `SCR1_XLEN'd2 : `SCR1_XLEN'd4);
 
 // steer-flag FIFO: push on request handshake, pop on response
 assign steer_resp      = steer_fifo[steer_fifo_rptr];
 assign steer_unal_resp = steer_fifo_unal[steer_fifo_rptr];
+assign steer_rvclo_resp = steer_fifo_rvclo[steer_fifo_rptr];
+`ifdef SCR1_BP_RVIUN
+assign steer_straddle_resp     = steer_fifo_straddle[steer_fifo_rptr];
+assign straddle_tgt_unal_resp  = steer_fifo_straddle_tgt_unal[steer_fifo_rptr];
+`else
+assign steer_straddle_resp     = 1'b0;
+assign straddle_tgt_unal_resp  = 1'b0;
+`endif // SCR1_BP_RVIUN
 
 always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
@@ -964,8 +1160,20 @@ always_ff @(posedge clk, negedge rst_n) begin
         steer_fifo_rptr <= '0;
     end else begin
         if (imem_handshake_done) begin
-            steer_fifo[steer_fifo_wptr]      <= btb_steer_req;
+            // Neither straddle NOR rvclo sets the main steer flag on their branch word:
+            // both have a co-resident half in the same word that must NOT be treated as
+            // a steered/safe head. For rvclo the co-resident is N.hi (an RVC branch there
+            // would spuriously hit the safe-commit path `q_steered_head & bp_ends_on_word`);
+            // for straddle it's N+1's aligned continuation. The main flag is for SAFE
+            // steers only; rvclo commit rides steer_fifo_rvclo, straddle rides
+            // steer_fifo_straddle, each with its own position gate.
+            steer_fifo[steer_fifo_wptr]      <= btb_steer_req & ~btb_rvclo_fetch; // SAFE steers only
             steer_fifo_unal[steer_fifo_wptr] <= btb_target_fetch[1]; // target alignment for the word AFTER this one
+            steer_fifo_rvclo[steer_fifo_wptr] <= btb_steer_req & btb_rvclo_fetch;
+`ifdef SCR1_BP_RVIUN
+            steer_fifo_straddle[steer_fifo_wptr]          <= btb_straddle_arm;          // marks word N (commit)
+            steer_fifo_straddle_tgt_unal[steer_fifo_wptr] <= straddle_apply ? straddle_pend_unal_ff : 1'b0; // marks N+1 (target unal)
+`endif // SCR1_BP_RVIUN
             steer_fifo_wptr                  <= steer_fifo_wptr + 1'b1;
         end
         if (imem_resp_received) begin
@@ -976,6 +1184,10 @@ end
 
 // Head steer flag, aligned with q_data_head / q_err_head
 assign q_steered_head = q_steered[SCR1_IFU_QUEUE_ADR_W'(q_rptr)];
+assign q_steered_rvclo_head = q_steered_rvclo[SCR1_IFU_QUEUE_ADR_W'(q_rptr)];
+`ifdef SCR1_BP_RVIUN
+assign q_steered_straddle_head = q_steered_straddle[SCR1_IFU_QUEUE_ADR_W'(q_rptr)];
+`endif // SCR1_BP_RVIUN
 `endif // SCR1_BP_BTB
 
 // Static predictor: direction + PC+imm target
@@ -997,6 +1209,52 @@ scr1_pipe_bpred #(
     .bp_bht_taken_i     (bht_taken         )
 `endif // SCR1_BP_DYNAMIC
 );
+
+`ifdef SCR1_BP_IBTB
+//------------------------------------------------------------------------------
+// Indirect-BTB: predict non-return indirect-jump targets at the queue head
+//------------------------------------------------------------------------------
+// Self-contained call/return decode (mirrors the RAS classes) so I-BTB does not
+// depend on the RAS being compiled in. RAS (returns) and I-BTB (non-returns) are
+// disjoint by instruction type, so no priority arbitration is needed.
+logic [`SCR1_IMEM_DWIDTH-1:0]      ibtb_instr;
+logic                             ibtb_rd_link, ibtb_rs1_link;
+logic                             ibtb_jalr, ibtb_cjr, ibtb_cjalr, ibtb_is_return, ibtb_is_ind;
+logic                             ibtb_hit_head;
+assign ibtb_instr    = ifu2idu_instr_o;
+assign ibtb_rd_link  = (ibtb_instr[11:7]  == 5'd1) | (ibtb_instr[11:7]  == 5'd5);
+assign ibtb_rs1_link = (ibtb_instr[19:15] == 5'd1) | (ibtb_instr[19:15] == 5'd5);
+assign ibtb_jalr     = (ibtb_instr[6:0] == 7'b1100111);
+assign ibtb_cjr      = (ibtb_instr[1:0]==2'b10) & (ibtb_instr[15:13]==3'b100)
+                     & (ibtb_instr[12]==1'b0) & (ibtb_instr[11:7]!=5'd0) & (ibtb_instr[6:2]==5'd0);
+assign ibtb_cjalr    = (ibtb_instr[1:0]==2'b10) & (ibtb_instr[15:13]==3'b100)
+                     & (ibtb_instr[12]==1'b1) & (ibtb_instr[11:7]!=5'd0) & (ibtb_instr[6:2]==5'd0);
+assign ibtb_is_return = (ibtb_jalr & ibtb_rs1_link & ~ibtb_rd_link)
+                      | (ibtb_cjr  & ((ibtb_instr[11:7]==5'd1)|(ibtb_instr[11:7]==5'd5)));
+assign ibtb_is_ind    = (ibtb_jalr | ibtb_cjr | ibtb_cjalr) & ~ibtb_is_return;
+
+scr1_pipe_ibtb #(
+    .SCR1_IBTB_SIZE  (SCR1_BP_IBTB_SIZE ),
+    .SCR1_IBTB_IDX_W (SCR1_BP_IBTB_IDX_W)
+) i_ibtb (
+    .clk              (clk                          ),
+    .rst_n            (rst_n                        ),
+    .ibtb_query_pc_i  (ifu_head_pc                  ),
+    .ibtb_hit_o       (ibtb_hit_head                ),
+    .ibtb_target_o    (ibtb_target                  ),
+    .ibtb_upd_vd_i    (exu2ifu_bp_ibtb_upd_vd_i     ),
+    .ibtb_upd_pc_i    (exu2ifu_bp_ibtb_upd_pc_i     ),
+    .ibtb_upd_target_i(exu2ifu_bp_ibtb_upd_target_i )
+);
+
+// Predict only when the head IS a non-return indirect jump and the cache hits.
+assign ibtb_predict_vd          = ibtb_is_ind & ibtb_hit_head;
+assign ifu2exu_bp_ibtb_vd_o     = ibtb_predict_vd;   // carried to EXU for verification
+assign ifu2exu_bp_ibtb_target_o = ibtb_target;
+`else // SCR1_BP_IBTB
+assign ibtb_predict_vd = 1'b0;
+assign ibtb_target     = '0;
+`endif // SCR1_BP_IBTB
 
 `ifdef SCR1_BP_RAS_EN
 //------------------------------------------------------------------------------
@@ -1054,12 +1312,15 @@ scr1_pipe_ras #(
 assign ifu2exu_bp_ras_vd_o     = ras_predict_vd;
 assign ifu2exu_bp_ras_target_o = ras_top;
 
-// Combined prediction: branch/jump (PC+imm) OR return (RAS top)
-assign bp_any_taken  = bp_predict_taken | ras_predict_vd;
-assign bp_any_target = ras_predict_vd ? ras_top : bp_predict_pc;
+// Combined prediction: branch/jump (PC+imm) OR return (RAS top) OR indirect (I-BTB).
+// RAS and I-BTB are disjoint by instruction type; keep RAS first for clarity.
+assign bp_any_taken  = bp_predict_taken | ras_predict_vd | ibtb_predict_vd;
+assign bp_any_target = ras_predict_vd  ? ras_top
+                     : ibtb_predict_vd ? ibtb_target
+                                       : bp_predict_pc;
 `else // SCR1_BP_RAS_EN
-assign bp_any_taken  = bp_predict_taken;
-assign bp_any_target = bp_predict_pc;
+assign bp_any_taken  = bp_predict_taken | ibtb_predict_vd;
+assign bp_any_target = ibtb_predict_vd ? ibtb_target : bp_predict_pc;
 `endif // SCR1_BP_RAS_EN
 
 // Redirect fetch on a predicted-taken instruction (EXU redirect wins)
@@ -1090,7 +1351,7 @@ assign pc_new_i2     = exu2ifu_pc_new_req_i ? exu2ifu_pc_new_i : bp_any_target;
 //------------------------------------------------------------------------------
 // Carry the predicted direction and the BHT index (shadow-PC[.:1]) to EXU
 assign ifu2exu_bp_predicted_taken_o = bp_predict_taken;
-assign ifu2exu_bp_index_o           = ifu_head_pc[SCR1_BP_BHT_IDX_W:1];
+assign ifu2exu_bp_index_o           = ifu_head_pc[SCR1_BP_BHT_IDX_W:1] ^ gshare_hash;
 `endif // SCR1_BP_DYNAMIC
 
 `ifdef SCR1_TRGT_SIMULATION

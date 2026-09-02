@@ -19,7 +19,7 @@ module scr1_top_tb_ahb (
 // Local parameters
 //-------------------------------------------------------------------------------
 localparam                          SCR1_MEM_SIZE       = 1024*1024;
-localparam                          TIMEOUT             = 'd2000_000;//20ms;
+localparam                          TIMEOUT             = 'd500_000_000;//20ms;
 localparam                          ARCH                = 'h1;
 localparam                          COMPLIANCE          = 'h2;
 localparam                          ADDR_START          = 'h200;
@@ -420,10 +420,87 @@ longint unsigned bpp_taken_rviun = 0; // RVI on an odd halfword (word-straddling
 // not-taken -> misfetch flush to the sequential path (a bubble the book's
 // fetch-time counter gating would avoid).
 longint unsigned bpp_steer_misfetch = 0;
+// Phase-2 (rvi_unaligned straddle steer): how many straddle steers were armed and
+// how many committed (early redirect, no flush). arm >> commit is fine (subset may
+// re-arm on stalls); commit=0 means the safe subset never fired in this workload.
+longint unsigned bpp_straddle_arm     = 0;
+longint unsigned bpp_straddle_commit  = 0;
+longint unsigned bpp_rvclo_commit     = 0;  // rvc_low early-steer commits (no-flush + squash)
+longint unsigned bpp_ibtb_hit         = 0;  // indirect jumps whose I-BTB target matched actual (no mispredict)
+// Mispredict split (which lever addresses the bub_exu shadow): direction vs indirect
+// target vs RAS-miss. Answers "what's left to optimize" before building a predictor.
+longint unsigned bpp_mispred_dir      = 0;  // conditional-branch direction  -> gshare/TAGE
+longint unsigned bpp_mispred_ind      = 0;  // indirect JALR target          -> indirect-BTB
+longint unsigned bpp_mispred_ret      = 0;  // predicted return missed        -> deeper RAS
+// Phase-0.c: attribute each late-redirect bubble (bub_bp) to the steerability
+// class of the head branch that caused the redirect -> ceiling per predecode phase.
+longint unsigned bpp_bpredir_safe  = 0; // late redirect: head safe (BTB-miss/BHT-gate addressable)
+longint unsigned bpp_bpredir_rvclo = 0; // ... rvc_low       (Phase-1 predecode addressable)
+longint unsigned bpp_bpredir_rviun = 0; // ... rvi_unaligned  (Phase-2 straddle addressable)
+longint unsigned bpp_bub_bp_safe   = 0; // bub_bp cycles owned by a safe redirect
+longint unsigned bpp_bub_bp_rvclo  = 0; // ... by an rvc_low redirect
+longint unsigned bpp_bub_bp_rviun  = 0; // ... by an rvi_unaligned redirect
+int unsigned     bpp_bp_class      = 0; // class owning the current bp shadow (0 safe,1 rvclo,2 rviun)
+
+// Phase-0 (fetch depth): fetch-supply attribution. Independent of the predictor.
+// Splits frontend starvation into the mechanism that would fix it:
+//   - LATENCY-bound : queue empty but a fetch is already in flight -> deeper queue /
+//                     wider fetch (more outstanding hides IMEM latency)
+//   - ISSUE-starved : queue empty AND no fetch in flight            -> re-pipeline the
+//                     request issue (Faza 2): we failed to keep a request outstanding
+//   - QRES-blocked  : in FETCH, would request but the queue reservation
+//                     (~q_has_free_slots) forbids it                -> deeper queue directly
+longint unsigned bpp_q_empty        = 0; // cycles queue empty
+longint unsigned bpp_req_block_qres = 0; // FETCH & ~pnd_full & ~q_has_free_slots
+longint unsigned bpp_req_block_pnd  = 0; // FETCH & pending-txn counter saturated
+longint unsigned bpp_bub_lat        = 0; // fe bubble & q empty & a txn pending (latency-bound)
+longint unsigned bpp_bub_issue      = 0; // fe bubble & q empty & no txn pending (issue-starved)
+longint unsigned bpp_pnd_hist [0:7] = '{default:0}; // histogram of valid pending-txn count
 
 always_ff @(posedge clk) begin
     if (rst_n) begin
+        // steerability class of the current IFU head branch (fetch-side view)
+        automatic logic          bpp_h_rvc = i_top.i_core_top.i_pipe_top.i_pipe_ifu.q_head_is_rvc;
+        automatic logic          bpp_h_p1  = i_top.i_core_top.i_pipe_top.i_pipe_ifu.ifu_head_pc[1];
+        automatic int unsigned   bpp_h_cls = (~(bpp_h_p1 ^ bpp_h_rvc)) ? 0 : ((bpp_h_rvc & ~bpp_h_p1) ? 1 : 2);
+        // Phase-0 fetch-supply sampling (predictor-independent)
+        automatic logic          fs_qempty  = i_top.i_core_top.i_pipe_top.i_pipe_ifu.q_is_empty;
+        automatic logic          fs_qfree   = i_top.i_core_top.i_pipe_top.i_pipe_ifu.q_has_free_slots;
+        automatic logic          fs_pndfull = i_top.i_core_top.i_pipe_top.i_pipe_ifu.imem_pnd_txns_q_full;
+        automatic logic          fs_infetch = i_top.i_core_top.i_pipe_top.i_pipe_ifu.ifu_fsm_fetch;
+        automatic logic          fs_pndnz   = |i_top.i_core_top.i_pipe_top.i_pipe_ifu.imem_pnd_txns_cnt;
+        automatic logic [2:0]    fs_vdpnd   = i_top.i_core_top.i_pipe_top.i_pipe_ifu.imem_vd_pnd_txns_cnt[2:0];
         bpp_cycles <= bpp_cycles + 1;
+        // Phase-0 fetch-supply attribution
+        if (fs_qempty)                              bpp_q_empty        <= bpp_q_empty        + 1;
+        if (fs_infetch & ~fs_pndfull & ~fs_qfree)   bpp_req_block_qres <= bpp_req_block_qres + 1;
+        if (fs_infetch & fs_pndfull)                bpp_req_block_pnd  <= bpp_req_block_pnd  + 1;
+        bpp_pnd_hist[fs_vdpnd] <= bpp_pnd_hist[fs_vdpnd] + 1;
+        if (i_top.i_core_top.i_pipe_top.idu2ifu_rdy &
+            ~i_top.i_core_top.i_pipe_top.ifu2idu_vd & fs_qempty) begin
+            if (fs_pndnz) bpp_bub_lat   <= bpp_bub_lat   + 1;
+            else          bpp_bub_issue <= bpp_bub_issue + 1;
+        end
+`ifdef SCR1_BP_HEADPC
+        // Retired-PC trace: one line per retired instruction. This is the
+        // ARCHITECTURAL stream and MUST be bit-identical baseline vs feature (the
+        // predictor only changes timing, never the executed instructions). Diff the
+        // two RPC traces; the first divergence pinpoints the exact retire where a
+        // predecode squash let a wrong instruction slip in. (rvclo/rviun bring-up)
+        if (i_top.i_core_top.i_pipe_top.instret)
+            $display("RPC %08h", i_top.i_core_top.i_pipe_top.i_pipe_exu.pc_curr_ff);
+`endif
+`ifdef SCR1_BP_TRACE
+        // Stage-2 branch trace: one line per retired CONDITIONAL branch:
+        //   BT <hex PC> <actual taken 0/1>
+        // Fed to the offline C reference model (bpsim) for direct-accuracy /
+        // algorithm comparison (bimodal / gshare / ideal), black-parrot style.
+        if (i_top.i_core_top.i_pipe_top.instret
+            & i_top.i_core_top.i_pipe_top.i_pipe_exu.exu_queue.branch_req)
+            $display("BT %08h %0d",
+                i_top.i_core_top.i_pipe_top.i_pipe_exu.pc_curr_ff,
+                i_top.i_core_top.i_pipe_top.i_pipe_exu.branch_taken);
+`endif
         if (i_top.i_core_top.i_pipe_top.instret)
             bpp_instret <= bpp_instret + 1;
         if (i_top.i_core_top.i_pipe_top.instret &
@@ -444,6 +521,13 @@ always_ff @(posedge clk) begin
         if (i_top.i_core_top.i_pipe_top.instret &
             i_top.i_core_top.i_pipe_top.i_pipe_exu.bp_mispredict)
             bpp_mispred <= bpp_mispred + 1;
+        // classify the mispredict by the lever that would fix it (retired only)
+        if (i_top.i_core_top.i_pipe_top.instret & i_top.i_core_top.i_pipe_top.i_pipe_exu.bp_mispred_dir)
+            bpp_mispred_dir <= bpp_mispred_dir + 1;
+        if (i_top.i_core_top.i_pipe_top.instret & i_top.i_core_top.i_pipe_top.i_pipe_exu.bp_mispred_ind)
+            bpp_mispred_ind <= bpp_mispred_ind + 1;
+        if (i_top.i_core_top.i_pipe_top.instret & i_top.i_core_top.i_pipe_top.i_pipe_exu.bp_mispred_ret)
+            bpp_mispred_ret <= bpp_mispred_ret + 1;
 `endif // SCR1_BPRED_EN
 `ifdef SCR1_BP_BTB
         // B2: count committed BTB-steered branches (early redirect, no flush)
@@ -452,12 +536,32 @@ always_ff @(posedge clk) begin
         // ... and steered branches the BHT then calls not-taken (misfetch flush)
         if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_steer_misfetch)
             bpp_steer_misfetch <= bpp_steer_misfetch + 1;
+`ifdef SCR1_BP_RVIUN
+        if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.btb_straddle_arm)
+            bpp_straddle_arm <= bpp_straddle_arm + 1;
+        if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_straddle_squash)
+            bpp_straddle_commit <= bpp_straddle_commit + 1;
+`endif // SCR1_BP_RVIUN
+`ifdef SCR1_BP_RVCLO
+        if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_rvclo_squash)
+            bpp_rvclo_commit <= bpp_rvclo_commit + 1;
+`endif // SCR1_BP_RVCLO
+`ifdef SCR1_BP_IBTB
+        if (i_top.i_core_top.i_pipe_top.instret & i_top.i_core_top.i_pipe_top.i_pipe_exu.ibtb_hit)
+            bpp_ibtb_hit <= bpp_ibtb_hit + 1;
+`endif // SCR1_BP_IBTB
 `endif // SCR1_BP_BTB
         // --- redirect events + shadow windows (Phase-0.b) ---
 `ifdef SCR1_BPRED_EN
         if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_redirect_req) begin
             bpp_bp_redir <= bpp_bp_redir + 1;
             bpp_bp_shadow <= BPP_W;
+            bpp_bp_class  <= bpp_h_cls; // remember cause for the shadow cycles
+            case (bpp_h_cls)
+                0: bpp_bpredir_safe  <= bpp_bpredir_safe  + 1;
+                1: bpp_bpredir_rvclo <= bpp_bpredir_rvclo + 1;
+                default: bpp_bpredir_rviun <= bpp_bpredir_rviun + 1;
+            endcase
         end else if (bpp_bp_shadow != 0)
             bpp_bp_shadow <= bpp_bp_shadow - 1;
 `endif // SCR1_BPRED_EN
@@ -471,9 +575,16 @@ always_ff @(posedge clk) begin
             ~i_top.i_core_top.i_pipe_top.ifu2idu_vd) begin
             bpp_fe_bubble <= bpp_fe_bubble + 1;
 `ifdef SCR1_BPRED_EN
-            if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_redirect_req | (bpp_bp_shadow != 0))
+            if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_redirect_req | (bpp_bp_shadow != 0)) begin
+                automatic int unsigned bpp_own =
+                    i_top.i_core_top.i_pipe_top.i_pipe_ifu.bp_redirect_req ? bpp_h_cls : bpp_bp_class;
                 bpp_bub_bp <= bpp_bub_bp + 1;
-            else
+                case (bpp_own)
+                    0: bpp_bub_bp_safe  <= bpp_bub_bp_safe  + 1;
+                    1: bpp_bub_bp_rvclo <= bpp_bub_bp_rvclo + 1;
+                    default: bpp_bub_bp_rviun <= bpp_bub_bp_rviun + 1;
+                endcase
+            end else
 `endif // SCR1_BPRED_EN
             if (i_top.i_core_top.i_pipe_top.i_pipe_ifu.exu2ifu_pc_new_req_i | (bpp_exu_shadow != 0))
                 bpp_bub_exu <= bpp_bub_exu + 1;
@@ -490,9 +601,28 @@ final begin
              bpp_bp_redir, bpp_exu_redir, bpp_bub_bp, bpp_bub_exu, bpp_bub_other);
 `ifdef SCR1_BP_BTB
     $display("BP_PROFILE3 btb_steer_commit=%0d steer_misfetch=%0d", bpp_btb_correct, bpp_steer_misfetch);
+`ifdef SCR1_BP_RVIUN
+    $display("BP_PROFILE_STRADDLE arm=%0d commit=%0d", bpp_straddle_arm, bpp_straddle_commit);
+`endif // SCR1_BP_RVIUN
+`ifdef SCR1_BP_RVCLO
+    $display("BP_PROFILE_RVCLO commit=%0d", bpp_rvclo_commit);
+`endif // SCR1_BP_RVCLO
+`ifdef SCR1_BP_IBTB
+    $display("BP_PROFILE_IBTB hit=%0d", bpp_ibtb_hit);
+`endif // SCR1_BP_IBTB
 `endif // SCR1_BP_BTB
+    $display("BP_MISPRED_SPLIT total=%0d dir=%0d indirect=%0d ras_miss=%0d",
+             bpp_mispred, bpp_mispred_dir, bpp_mispred_ind, bpp_mispred_ret);
     $display("BP_PROFILE4 taken_total=%0d safe=%0d rvc_low=%0d rvi_unaligned=%0d",
              bpp_taken_total, bpp_taken_safe, bpp_taken_rvclo, bpp_taken_rviun);
+    $display("BP_PROFILE5 bpredir[safe=%0d rvclo=%0d rviun=%0d] bub_bp[safe=%0d rvclo=%0d rviun=%0d]",
+             bpp_bpredir_safe, bpp_bpredir_rvclo, bpp_bpredir_rviun,
+             bpp_bub_bp_safe, bpp_bub_bp_rvclo, bpp_bub_bp_rviun);
+    // Phase-0 fetch-supply: latency-bound vs issue-starved vs queue-reservation-blocked
+    $display("BP_FETCH q_empty=%0d req_block_qres=%0d req_block_pnd=%0d bub_lat=%0d bub_issue=%0d",
+             bpp_q_empty, bpp_req_block_qres, bpp_req_block_pnd, bpp_bub_lat, bpp_bub_issue);
+    $display("BP_FETCH_PND hist[0..4]=%0d %0d %0d %0d %0d",
+             bpp_pnd_hist[0], bpp_pnd_hist[1], bpp_pnd_hist[2], bpp_pnd_hist[3], bpp_pnd_hist[4]);
 end
 `endif // SCR1_BP_PROFILE
 

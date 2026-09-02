@@ -167,13 +167,40 @@ parameter int unsigned SCR1_RAS_DEPTH = 4;   // RAS depth
 parameter int unsigned SCR1_BP_BHT_SIZE  = 1024;                     // BHT entries (2-bit saturating counters)
 parameter int unsigned SCR1_BP_BHT_IDX_W = $clog2(SCR1_BP_BHT_SIZE); // BHT index width
 
+// gshare: index BHT by (branch PC XOR global branch history). Requires SCR1_BP_DYNAMIC.
+//`define SCR1_BP_GSHARE
+parameter int unsigned SCR1_BP_GHR_W = 2;   // global history width (<= SCR1_BP_BHT_IDX_W)
+
 // Early Branch Target Buffer (fetch-PC-indexed target cache). Requires SCR1_BPRED_EN.
 `define SCR1_BP_BTB
 parameter int unsigned SCR1_BP_BTB_SIZE  = 256;                      // BTB entries (directly-mapped)
 parameter int unsigned SCR1_BP_BTB_IDX_W = $clog2(SCR1_BP_BTB_SIZE); // BTB index width
 
+// RVI-unaligned (straddle) early steer: predecode-steer 32-bit branches that cross a
+// fetch-word boundary. Requires SCR1_BP_BTB. sim: -3.20% CoreMark, 16/16 Embench,
+// all CRC golden. See bpred_doc/06_rvi_predecode.md. (timing-check 2026-08-26)
+`define SCR1_BP_RVIUN
+
+// RVC-low early steer: predecode-steer 16-bit branches in the low half of a fetch
+// word, gated by a fetch-side entry-alignment check (entered_high). Requires
+// SCR1_BP_BTB. sim: with RVIUN, CoreMark 3843->3811, bub_bp[rvclo] 4935->700, 16/16
+// Embench, all CRC golden. See bpred_doc/06_rvi_predecode.md appendix. (2026-08-26)
+`define SCR1_BP_RVCLO
+
+// Indirect-BTB: last-target cache for non-return indirect jumps (jalr/c.jr/c.jalr),
+// predicted head-side like the RAS. Requires SCR1_BP_BTB (+ RAS for return priority).
+// Game-relevant (function-pointer/callback code); CoreMark barely exercises it. Pure
+// win (correct, zero regression): wikisort indirect mispredict 10807->223, 16/16
+// Embench, all CRC golden. Head-side saves ~1 cycle/hit on TCM (short pipe); a
+// fetch-side variant scales with memory latency (worth revisiting once the cache lands).
+`define SCR1_BP_IBTB
+parameter int unsigned SCR1_BP_IBTB_SIZE  = 64;
+parameter int unsigned SCR1_BP_IBTB_IDX_W = $clog2(SCR1_BP_IBTB_SIZE);
+
 // IFU fetch-queue depth in 32-bit words
-parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 2;
+// q4 for DOOM: deeper fetch queue hides DDR/fetch latency (frontend-bound);
+// q2->q4 was -15% CoreMark and met timing on-board. Rebuild pending (with cache).
+parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 4;
 
 // Bypasses on AXI/AHB bridge I/O
 `define SCR1_IMEM_AHB_IN_BP         // bypass instruction memory AHB bridge input register

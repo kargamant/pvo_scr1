@@ -182,8 +182,19 @@ module scr1_pipe_exu (
     output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_btb_upd_pc_o,
     output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_btb_upd_target_o,
     output  logic                               exu2ifu_bp_btb_upd_safe_o,
-    output  logic                               exu2ifu_bp_btb_upd_is_cond_o
+    output  logic                               exu2ifu_bp_btb_upd_is_cond_o,
+    output  logic                               exu2ifu_bp_btb_upd_rvclo_o
 `endif // SCR1_BP_BTB
+`ifdef SCR1_BP_IBTB
+    ,
+    // IFU -> EXU: indirect-BTB prediction (for verification)
+    input   logic                               ifu2exu_bp_ibtb_vd_i,       // head predicted an indirect target
+    input   logic [`SCR1_XLEN-1:0]              ifu2exu_bp_ibtb_target_i,   // predicted indirect target
+    // EXU -> IFU: indirect-BTB training channel (resolved indirect jump)
+    output  logic                               exu2ifu_bp_ibtb_upd_vd_o,
+    output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_ibtb_upd_pc_o,
+    output  logic [`SCR1_XLEN-1:0]              exu2ifu_bp_ibtb_upd_target_o
+`endif // SCR1_BP_IBTB
 );
 
 //------------------------------------------------------------------------------
@@ -285,6 +296,7 @@ logic                               jb_misalign;
 logic                               bp_taken;           // predicted taken
 logic                               bp_dir_pred;        // predicted direction for mispredict
 logic                               bp_mispredict;      // prediction != actual outcome
+logic                               ibtb_hit;           // I-BTB predicted the indirect target correctly
 logic                               bp_recover_seq;     // predicted taken, resolved not-taken
 logic                               pc_curr_transfer;   // architectural control transfer this cycle
 
@@ -298,6 +310,15 @@ logic                               bp_ras_vd_ff;
 logic [`SCR1_XLEN-1:0]              bp_ras_target_ff;
 `endif // SCR1_NO_EXE_STAGE
 `endif // SCR1_BP_RAS_EN
+`ifdef SCR1_BP_IBTB
+// Indirect-BTB prediction, carried from the IFU and checked here (mirrors the RAS)
+logic                               exu_bp_ibtb_vd;
+logic [`SCR1_XLEN-1:0]              exu_bp_ibtb_target;
+`ifndef SCR1_NO_EXE_STAGE
+logic                               bp_ibtb_vd_ff;
+logic [`SCR1_XLEN-1:0]              bp_ibtb_target_ff;
+`endif // SCR1_NO_EXE_STAGE
+`endif // SCR1_BP_IBTB
 
 `ifdef SCR1_BP_DYNAMIC
 // Dynamic predictor: carried prediction bit + BHT index
@@ -412,6 +433,10 @@ always_ff @(posedge clk) begin
         bp_ras_vd_ff             <= ifu2exu_bp_ras_vd_i;
         bp_ras_target_ff         <= ifu2exu_bp_ras_target_i;
 `endif // SCR1_BP_RAS_EN
+`ifdef SCR1_BP_IBTB
+        bp_ibtb_vd_ff            <= ifu2exu_bp_ibtb_vd_i;
+        bp_ibtb_target_ff        <= ifu2exu_bp_ibtb_target_i;
+`endif // SCR1_BP_IBTB
 `ifdef SCR1_BP_DYNAMIC
         bp_predicted_taken_ff    <= ifu2exu_bp_predicted_taken_i;
         bp_index_ff              <= ifu2exu_bp_index_i;
@@ -844,11 +869,45 @@ assign exu_bp_ras_target = ifu2exu_bp_ras_target_i;
 `endif // SCR1_NO_EXE_STAGE
 // Correctly predicted return (RAS target == actual)
 assign ras_hit        = exu_bp_ras_vd & (jb_new_pc == exu_bp_ras_target);
-assign bp_mispredict  = (jb_taken ^ bp_dir_pred) & ~ras_hit;
+assign bp_mispredict  = (jb_taken ^ bp_dir_pred) & ~ras_hit & ~ibtb_hit;
 `else // SCR1_BP_RAS_EN
-assign bp_mispredict  = jb_taken ^ bp_dir_pred;
+assign bp_mispredict  = (jb_taken ^ bp_dir_pred) & ~ibtb_hit;
 `endif // SCR1_BP_RAS_EN
+// Correctly predicted indirect target (I-BTB target == actual) suppresses the
+// mispredict, exactly like ras_hit — the head already steered to the right target.
+// Use the pipeline-registered prediction (aligned with the instruction in EXU).
+`ifdef SCR1_BP_IBTB
+`ifndef SCR1_NO_EXE_STAGE
+assign exu_bp_ibtb_vd     = bp_ibtb_vd_ff;
+assign exu_bp_ibtb_target = bp_ibtb_target_ff;
+`else // SCR1_NO_EXE_STAGE
+assign exu_bp_ibtb_vd     = ifu2exu_bp_ibtb_vd_i;
+assign exu_bp_ibtb_target = ifu2exu_bp_ibtb_target_i;
+`endif // SCR1_NO_EXE_STAGE
+assign ibtb_hit       = exu_bp_ibtb_vd & (jb_new_pc == exu_bp_ibtb_target);
+`else
+assign ibtb_hit       = 1'b0;
+`endif // SCR1_BP_IBTB
 assign bp_recover_seq = exu_queue_vd & bp_mispredict & ~jb_taken;
+
+`ifdef SCR1_BP_PROFILE
+// Mispredict classification (which predictor lever would address it). Computed here
+// where sum2_op / the RAS flag are natively in scope; read hierarchically by the tb.
+logic bp_mispred_dir;   // conditional-branch DIRECTION error        -> better direction predictor (gshare/TAGE)
+logic bp_mispred_ind;   // indirect JALR TARGET, not a predicted ret -> indirect-BTB
+logic bp_mispred_ret;   // predicted return that MISSED              -> deeper/better RAS
+assign bp_mispred_dir = exu_queue_vd & bp_mispredict & exu_queue.branch_req;
+`ifdef SCR1_BP_RAS_EN
+assign bp_mispred_ind = exu_queue_vd & bp_mispredict & exu_queue.jump_req
+                      & (exu_queue.sum2_op == SCR1_SUM2_OP_REG_IMM) & ~exu_bp_ras_vd;
+assign bp_mispred_ret = exu_queue_vd & bp_mispredict & exu_queue.jump_req
+                      & (exu_queue.sum2_op == SCR1_SUM2_OP_REG_IMM) &  exu_bp_ras_vd;
+`else
+assign bp_mispred_ind = exu_queue_vd & bp_mispredict & exu_queue.jump_req
+                      & (exu_queue.sum2_op == SCR1_SUM2_OP_REG_IMM);
+assign bp_mispred_ret = 1'b0;
+`endif // SCR1_BP_RAS_EN
+`endif // SCR1_BP_PROFILE
 
 `ifdef SCR1_BP_DYNAMIC
 //------------------------------------------------------------------------------
@@ -881,7 +940,19 @@ assign exu2ifu_bp_btb_upd_target_o = jb_new_pc;
 assign exu2ifu_bp_btb_upd_safe_o   = ~(pc_curr_ff[1] ^ exu_queue.instr_rvc);
 // is_cond = conditional branch (else unconditional jump)
 assign exu2ifu_bp_btb_upd_is_cond_o = exu_queue.branch_req;
+// rvc_low = RVC branch in the low half of its fetch word (unsafe class, Phase-1 steerable)
+assign exu2ifu_bp_btb_upd_rvclo_o   = exu_queue.instr_rvc & ~pc_curr_ff[1];
 `endif // SCR1_BP_BTB
+
+`ifdef SCR1_BP_IBTB
+// Indirect-BTB training: any retired indirect jump (jalr / c.jr / c.jalr -> REG_IMM).
+// Returns are trained here too but never predicted (RAS wins), so no filtering needed.
+assign exu2ifu_bp_ibtb_upd_vd_o     = exu_queue_vd & exu_rdy
+                                    & exu_queue.jump_req
+                                    & (exu_queue.sum2_op == SCR1_SUM2_OP_REG_IMM);
+assign exu2ifu_bp_ibtb_upd_pc_o     = pc_curr_ff;   // call-site PC
+assign exu2ifu_bp_ibtb_upd_target_o = jb_new_pc;    // resolved target
+`endif // SCR1_BP_IBTB
 
 // PC to be loaded on MRET from interrupt trap
 assign exu2csr_pc_next_o  = ~exu_queue_vd ? pc_curr_ff

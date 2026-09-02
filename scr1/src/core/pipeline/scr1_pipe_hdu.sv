@@ -1,4 +1,4 @@
-/// Copyright by Syntacore LLC © 2016-2021. See LICENSE for details
+/// Copyright by Syntacore LLC ï¿½ 2016-2021. See LICENSE for details
 /// @file       <scr1_pipe_hdu.sv>
 /// @brief      HART Debug Unit (HDU)
 ///
@@ -882,12 +882,14 @@ SVA_HDU_XCHECK_DM_INTF :
     )
     else $error("HDU Error: DM i/f is in X state");
 
+`ifdef SCR1_TDU_EN
 SVA_HDU_XCHECK_TDU_INTF :
     assert property (
         @(negedge clk) disable iff (~rst_n)
         !$isunknown( {tdu2hdu_dmode_req_i,exu2hdu_ibrkpt_hw_i} )
     )
     else $error("HDU Error: TDU i/f is in X state");
+`endif // SCR1_TDU_EN
 
 SVA_HDU_XCHECK_HART_INTF :
     assert property (
