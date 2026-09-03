@@ -16,11 +16,15 @@
 //`define SCR1_TRGT_FPGA_INTEL_ARRIAV  // ---> Uncomment if target platform is Intel Arria V FPGAs
 
 // Uncomment to enable local ILA debug instrumentation
-`define SCR1_DEBUG_ILA
+//`define SCR1_DEBUG_ILA
 
 // Uncomment to enable 32-bit I-cache and D-cache performance counters.
 // Counter ILAs additionally require SCR1_DEBUG_ILA.
-`define SCR1_CACHE_PERF_COUNTERS
+//`define SCR1_CACHE_PERF_COUNTERS
+
+// Enable the targeted I-cache request/refill/invalidation trace. This reuses
+// an existing performance ILA without enabling the other local debug ILAs.
+`define SCR1_ICACHE_INVALIDATE_ILA
 
 
 
