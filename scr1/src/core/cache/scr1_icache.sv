@@ -78,6 +78,7 @@ module scr1_icache #(
     logic                         cpu_addr_cacheable;
     logic                         req_hit;
     logic                         refill_abort_for_invalidate;
+    logic                         refill_done;
     logic [`SCR1_IMEM_AWIDTH-1:0] fill_addr;
 
 `ifdef SCR1_ICACHE_INVALIDATE_ILA
@@ -144,6 +145,8 @@ module scr1_icache #(
     // is speculative from the processor's point of view and may be abandoned
     // at a memory-transaction boundary to service an invalidate promptly.
     assign refill_abort_for_invalidate = critical_word_captured && invalidate_i;
+    
+    assign refill_done = (fill_word_q == (req_word_index - WORD_INDEX_BITS'(1)));
 
 `ifdef SCR1_ICACHE_INVALIDATE_ILA
     assign invalidate_debug_valid_lo = valid_q[31:0];
@@ -165,8 +168,7 @@ module scr1_icache #(
     assign perf_refill_word_event = (state_q == IC_FILL_WAIT)
                                   && (mem_resp_i == SCR1_MEM_RESP_RDY_OK);
     assign perf_refill_done_event = perf_refill_word_event
-                                  && (fill_word_q
-                                      == WORD_INDEX_BITS'(LINE_WORDS - 1));
+                                  && refill_done;
 
     assign perf_mem_req_wait_event = ((state_q == IC_IDLE)
                                       && !invalidate_i && cpu_req_i
@@ -241,7 +243,7 @@ module scr1_icache #(
                     end else if ((fill_word_q == req_word_index) &&
                             !critical_word_captured) begin
                         state_d = IC_RESP_OK;
-                    end else if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                    end else if (refill_done) begin
                         state_d = critical_word_captured ? IC_IDLE : IC_RESP_OK;
                     end else begin
                         state_d = IC_FILL_REQ;
@@ -347,7 +349,7 @@ module scr1_icache #(
             && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
             data_mem[fill_data_index] <= mem_rdata_i;
 
-            if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+            if (refill_done) begin
                 tag_mem[req_line_index] <= req_tag;
             end
         end
@@ -371,7 +373,7 @@ module scr1_icache #(
             end
 
             if ((state_q == IC_LOOKUP) && req_cacheable && !req_hit) begin
-                fill_word_q            <= '0;
+                fill_word_q            <= req_word_index;
                 valid_q[req_line_index] <= 1'b0;
                 critical_word_captured <= '0; 
             end
@@ -394,12 +396,12 @@ module scr1_icache #(
                     critical_word_captured <= 1'b1;
                 end
 
-                if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                if (refill_done) begin
                     valid_q[req_line_index]   <= 1'b1;
                     critical_word_captured <= '0;
-                end else begin
-                    fill_word_q <= fill_word_q + 1'b1;
                 end
+
+                fill_word_q <= fill_word_q + 1'b1;
             end
 
             if (state_q == IC_INVALIDATE) begin
