@@ -11,8 +11,8 @@ if {![info exists scbl_loader]} {
 
 set script_dir [file dirname [file normalize [info script]]]
 set bootloader_files [dict create \
-    default "scbl.mem" \
-    fencei  "scbl_fencei.mem"]
+    default "scbl_fencei.mem" \
+    no_fencei  "scbl.mem"]
 
 if {[dict exists $bootloader_files $scbl_loader]} {
     set mem_file [file join $script_dir [dict get $bootloader_files $scbl_loader]]
@@ -23,7 +23,7 @@ if {[dict exists $bootloader_files $scbl_loader]} {
         set mem_file [file join $script_dir $scbl_loader]
     }
 } else {
-    error "ERROR! Unknown bootloader '$scbl_loader'. Use 'default', 'fencei', or a path to a .mem file."
+    error "ERROR! Unknown bootloader '$scbl_loader'. Use 'default', 'no_fencei', or a path to a .mem file."
 }
 
 # Input parameters:

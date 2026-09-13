@@ -65,6 +65,7 @@ module scr1_icache #(
     type_scr1_mem_cmd_e           req_cmd_q;
     logic [WORD_INDEX_BITS-1:0]   fill_word_q;
     logic [`SCR1_IMEM_DWIDTH-1:0] response_data_q;
+    logic                         critical_word_captured;
 
     logic [LINE_INDEX_BITS-1:0]   req_line_index;
     logic [WORD_INDEX_BITS-1:0]   req_word_index;
@@ -76,7 +77,41 @@ module scr1_icache #(
     logic                         req_cacheable;
     logic                         cpu_addr_cacheable;
     logic                         req_hit;
+    logic                         refill_abort_for_invalidate;
+    logic                         refill_done;
     logic [`SCR1_IMEM_AWIDTH-1:0] fill_addr;
+
+`ifdef SCR1_ICACHE_INVALIDATE_ILA
+    logic [31:0]                  invalidate_debug_valid_lo;
+    logic [31:0]                  invalidate_debug_valid_hi;
+`endif // SCR1_ICACHE_INVALIDATE_ILA
+
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    logic                         perf_req_event;
+    logic                         perf_lookup_event;
+    logic                         perf_hit_event;
+    logic                         perf_miss_event;
+    logic                         perf_bypass_event;
+    logic                         perf_refill_word_event;
+    logic                         perf_refill_done_event;
+    logic                         perf_mem_req_wait_event;
+    logic                         perf_mem_resp_wait_event;
+    logic                         perf_error_event;
+    logic                         perf_invalidate_event;
+    logic                         perf_miss_active_q;
+
+    logic [31:0]                  perf_req_count_q;
+    logic [31:0]                  perf_hit_count_q;
+    logic [31:0]                  perf_miss_count_q;
+    logic [31:0]                  perf_bypass_count_q;
+    logic [31:0]                  perf_refill_word_count_q;
+    logic [31:0]                  perf_refill_count_q;
+    logic [31:0]                  perf_miss_cycles_q;
+    logic [31:0]                  perf_mem_req_wait_q;
+    logic [31:0]                  perf_mem_resp_wait_q;
+    logic [31:0]                  perf_error_count_q;
+    logic [31:0]                  perf_invalidate_count_q;
+`endif // SCR1_CACHE_PERF_COUNTERS
 
     integer line;
 
@@ -106,6 +141,50 @@ module scr1_icache #(
     assign cpu_addr_cacheable = (cpu_addr_i & CACHEABLE_ADDR_MASK) == CACHEABLE_ADDR_PATTERN;
     assign req_hit       = valid_q[req_line_index]
                          && (tag_mem[req_line_index] == req_tag);
+    // Once Early Restart has answered the processor, the remaining line fill
+    // is speculative from the processor's point of view and may be abandoned
+    // at a memory-transaction boundary to service an invalidate promptly.
+    assign refill_abort_for_invalidate = critical_word_captured && invalidate_i;
+    
+    assign refill_done = (fill_word_q == (req_word_index - WORD_INDEX_BITS'(1)));
+
+`ifdef SCR1_ICACHE_INVALIDATE_ILA
+    assign invalidate_debug_valid_lo = valid_q[31:0];
+    assign invalidate_debug_valid_hi = valid_q[63:32];
+`endif // SCR1_ICACHE_INVALIDATE_ILA
+
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    // All event signals are single-cycle pulses. Counting the LOOKUP decision,
+    // rather than IC_RESP_OK, keeps hits separate from completed refills.
+    assign perf_req_event = (state_q == IC_IDLE)
+                          && cpu_req_i && cpu_req_ack_o;
+    assign perf_lookup_event = (state_q == IC_LOOKUP)
+                             && (req_cmd_q == SCR1_MEM_CMD_RD)
+                             && req_cacheable;
+    assign perf_hit_event  = perf_lookup_event && req_hit;
+    assign perf_miss_event = perf_lookup_event && !req_hit;
+    assign perf_bypass_event = perf_req_event && !cpu_addr_cacheable;
+
+    assign perf_refill_word_event = (state_q == IC_FILL_WAIT)
+                                  && (mem_resp_i == SCR1_MEM_RESP_RDY_OK);
+    assign perf_refill_done_event = perf_refill_word_event
+                                  && refill_done;
+
+    assign perf_mem_req_wait_event = ((state_q == IC_IDLE)
+                                      && !invalidate_i && cpu_req_i
+                                      && !cpu_addr_cacheable
+                                      && !mem_req_ack_i)
+                                   || (((state_q == IC_FILL_REQ)
+                                        || (state_q == IC_BYPASS_REQ))
+                                       && !mem_req_ack_i);
+    assign perf_mem_resp_wait_event = (((state_q == IC_FILL_WAIT)
+                                        || (state_q == IC_BYPASS_WAIT))
+                                       && (mem_resp_i
+                                           == SCR1_MEM_RESP_NOTRDY));
+    assign perf_error_event = (cpu_resp_o == SCR1_MEM_RESP_RDY_ER);
+    assign perf_invalidate_event = (state_q != IC_INVALIDATE)
+                                 && (state_d == IC_INVALIDATE);
+`endif // SCR1_CACHE_PERF_COUNTERS
 
     always_comb begin
         fill_addr = req_addr_q;
@@ -144,17 +223,28 @@ module scr1_icache #(
             end
 
             IC_FILL_REQ: begin
-                if (mem_req_ack_i) begin
+                if (refill_abort_for_invalidate) begin
+                    state_d = IC_INVALIDATE;
+                end else if (mem_req_ack_i) begin
                     state_d = IC_FILL_WAIT;
                 end
             end
 
             IC_FILL_WAIT: begin
                 if (mem_resp_i == SCR1_MEM_RESP_RDY_ER) begin
-                    state_d = IC_RESP_ERR;
+                    if (refill_abort_for_invalidate) begin
+                        state_d = IC_INVALIDATE;
+                    end else begin
+                        state_d = critical_word_captured ? IC_IDLE : IC_RESP_ERR;
+                    end
                 end else if (mem_resp_i == SCR1_MEM_RESP_RDY_OK) begin
-                    if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                    if (refill_abort_for_invalidate) begin
+                        state_d = IC_INVALIDATE;
+                    end else if ((fill_word_q == req_word_index) &&
+                            !critical_word_captured) begin
                         state_d = IC_RESP_OK;
+                    end else if (refill_done) begin
+                        state_d = critical_word_captured ? IC_IDLE : IC_RESP_OK;
                     end else begin
                         state_d = IC_FILL_REQ;
                     end
@@ -176,7 +266,13 @@ module scr1_icache #(
 
             IC_RESP_OK,
             IC_RESP_ERR: begin
-                state_d = IC_IDLE;
+                if (invalidate_i) begin
+                    state_d = IC_INVALIDATE;
+                end else if (critical_word_captured && !valid_q[req_line_index]) begin
+                    state_d = IC_FILL_REQ;
+                end else begin
+                    state_d = IC_IDLE;
+                end
             end
 
             IC_INVALIDATE: begin
@@ -218,7 +314,7 @@ module scr1_icache #(
             end
         end
 
-        if (state_q == IC_FILL_REQ) begin
+        if ((state_q == IC_FILL_REQ) && !refill_abort_for_invalidate) begin
             mem_req_o  = 1'b1;
             mem_addr_o = fill_addr;
         end else if (state_q == IC_BYPASS_REQ) begin
@@ -253,7 +349,7 @@ module scr1_icache #(
             && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
             data_mem[fill_data_index] <= mem_rdata_i;
 
-            if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+            if (refill_done) begin
                 tag_mem[req_line_index] <= req_tag;
             end
         end
@@ -267,6 +363,7 @@ module scr1_icache #(
             req_cmd_q      <= SCR1_MEM_CMD_RD;
             fill_word_q    <= '0;
             response_data_q <= '0;
+            critical_word_captured <= '0;
         end else begin
             state_q <= state_d;
 
@@ -276,8 +373,9 @@ module scr1_icache #(
             end
 
             if ((state_q == IC_LOOKUP) && req_cacheable && !req_hit) begin
-                fill_word_q            <= '0;
+                fill_word_q            <= req_word_index;
                 valid_q[req_line_index] <= 1'b0;
+                critical_word_captured <= '0; 
             end
 
             if ((state_q == IC_LOOKUP) && req_cacheable && req_hit
@@ -286,24 +384,136 @@ module scr1_icache #(
             end
 
             if ((state_q == IC_FILL_WAIT)
+                    && (mem_resp_i == SCR1_MEM_RESP_RDY_ER)
+                    && critical_word_captured) begin
+                    critical_word_captured <= 1'b0;
+            end
+
+            if ((state_q == IC_FILL_WAIT)
                 && (mem_resp_i == SCR1_MEM_RESP_RDY_OK)) begin
                 if (fill_word_q == req_word_index) begin
                     response_data_q <= mem_rdata_i;
+                    critical_word_captured <= 1'b1;
                 end
 
-                if (fill_word_q == WORD_INDEX_BITS'(LINE_WORDS - 1)) begin
+                if (refill_done) begin
                     valid_q[req_line_index]   <= 1'b1;
-                end else begin
-                    fill_word_q <= fill_word_q + 1'b1;
+                    critical_word_captured <= '0;
                 end
+
+                fill_word_q <= fill_word_q + 1'b1;
             end
 
             if (state_q == IC_INVALIDATE) begin
                 for (line = 0; line < NUM_LINES; line = line + 1) begin
                     valid_q[line] <= 1'b0;
                 end
+                critical_word_captured <= 1'b0;
             end
         end
     end
+
+`ifdef SCR1_ICACHE_INVALIDATE_ILA
+    // Reuse the existing 15 x 32-bit performance ILA. Narrow control signals
+    // are zero-extended so every value remains a separate Hardware Manager
+    // probe and no packed status-bus decoding is required.
+    ila_dcache_perf i_icache_invalidate_debug_ila (
+        .clk     (clk),
+        .probe0  ({28'b0, state_q}),
+        .probe1  ({31'b0, cpu_req_i}),
+        .probe2  ({31'b0, cpu_req_ack_o}),
+        .probe3  (cpu_addr_i),
+        .probe4  ({30'b0, cpu_resp_o}),
+        .probe5  (req_addr_q),
+        .probe6  ({31'b0, critical_word_captured}),
+        .probe7  ({30'b0, fill_word_q}),
+        .probe8  ({31'b0, mem_req_o}),
+        .probe9  ({31'b0, mem_req_ack_i}),
+        .probe10 ({30'b0, mem_resp_i}),
+        .probe11 ({31'b0, invalidate_i}),
+        .probe12 ({31'b0, invalidate_ack_o}),
+        .probe13 (invalidate_debug_valid_lo),
+        .probe14 (invalidate_debug_valid_hi)
+    );
+`endif // SCR1_ICACHE_INVALIDATE_ILA
+
+`ifdef SCR1_CACHE_PERF_COUNTERS
+    // The counters intentionally wrap at 2^32. perf_miss_cycles_q measures the
+    // processor-visible interval from a cacheable miss to the cache response.
+    always_ff @(posedge clk, negedge rst_n) begin
+        if (!rst_n) begin
+            perf_miss_active_q     <= 1'b0;
+            perf_req_count_q       <= '0;
+            perf_hit_count_q       <= '0;
+            perf_miss_count_q      <= '0;
+            perf_bypass_count_q    <= '0;
+            perf_refill_word_count_q <= '0;
+            perf_refill_count_q    <= '0;
+            perf_miss_cycles_q     <= '0;
+            perf_mem_req_wait_q    <= '0;
+            perf_mem_resp_wait_q   <= '0;
+            perf_error_count_q     <= '0;
+            perf_invalidate_count_q <= '0;
+        end else begin
+            if (perf_req_event) begin
+                perf_req_count_q <= perf_req_count_q + 1'b1;
+            end
+            if (perf_hit_event) begin
+                perf_hit_count_q <= perf_hit_count_q + 1'b1;
+            end
+            if (perf_miss_event) begin
+                perf_miss_count_q  <= perf_miss_count_q + 1'b1;
+                perf_miss_active_q <= 1'b1;
+            end
+            if (perf_bypass_event) begin
+                perf_bypass_count_q <= perf_bypass_count_q + 1'b1;
+            end
+            if (perf_refill_word_event) begin
+                perf_refill_word_count_q <= perf_refill_word_count_q + 1'b1;
+            end
+            if (perf_refill_done_event) begin
+                perf_refill_count_q <= perf_refill_count_q + 1'b1;
+            end
+            if (perf_miss_active_q) begin
+                perf_miss_cycles_q <= perf_miss_cycles_q + 1'b1;
+            end
+            if (perf_mem_req_wait_event) begin
+                perf_mem_req_wait_q <= perf_mem_req_wait_q + 1'b1;
+            end
+            if (perf_mem_resp_wait_event) begin
+                perf_mem_resp_wait_q <= perf_mem_resp_wait_q + 1'b1;
+            end
+            if (perf_error_event) begin
+                perf_error_count_q <= perf_error_count_q + 1'b1;
+            end
+            if (perf_invalidate_event) begin
+                perf_invalidate_count_q <= perf_invalidate_count_q + 1'b1;
+            end
+
+            if (perf_miss_active_q
+                && ((cpu_resp_o == SCR1_MEM_RESP_RDY_OK)
+                    || (cpu_resp_o == SCR1_MEM_RESP_RDY_ER))) begin
+                perf_miss_active_q <= 1'b0;
+            end
+        end
+    end
+
+`ifdef SCR1_DEBUG_ILA
+    ila_icache_perf i_icache_perf_ila (
+        .clk     (clk),
+        .probe0  (perf_req_count_q),
+        .probe1  (perf_hit_count_q),
+        .probe2  (perf_miss_count_q),
+        .probe3  (perf_bypass_count_q),
+        .probe4  (perf_refill_word_count_q),
+        .probe5  (perf_refill_count_q),
+        .probe6  (perf_miss_cycles_q),
+        .probe7  (perf_mem_req_wait_q),
+        .probe8  (perf_mem_resp_wait_q),
+        .probe9  (perf_error_count_q),
+        .probe10 (perf_invalidate_count_q)
+    );
+`endif // SCR1_DEBUG_ILA
+`endif // SCR1_CACHE_PERF_COUNTERS
 
 endmodule
