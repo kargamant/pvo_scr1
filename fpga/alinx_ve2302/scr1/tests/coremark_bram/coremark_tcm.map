@@ -1,0 +1,503 @@
+Archive member included to satisfy reference by file (symbol)
+
+/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+                              core_state.o (memset)
+/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+                              sc_print.o (strnlen)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+                              sc_print.o (__moddi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+                              sc_print.o (__udivdi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+                              sc_print.o (__umoddi3)
+/usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+                              /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o) (__clz_tab)
+
+Discarded input sections
+
+ .text          0x00000000        0x0 crt.o
+ .data          0x00000000        0x0 crt.o
+ .bss           0x00000000        0x0 crt.o
+ .text          0x00000000        0x0 core_portme.o
+ .data          0x00000000        0x0 core_portme.o
+ .bss           0x00000000        0x0 core_portme.o
+ .text          0x00000000        0x0 mbox_syscalls.o
+ .data          0x00000000        0x0 mbox_syscalls.o
+ .bss           0x00000000        0x0 mbox_syscalls.o
+ .text._write   0x00000000       0x4c mbox_syscalls.o
+ .text._sbrk    0x00000000       0x34 mbox_syscalls.o
+ .text._read    0x00000000        0x8 mbox_syscalls.o
+ .text._close   0x00000000        0x8 mbox_syscalls.o
+ .text._lseek   0x00000000        0x8 mbox_syscalls.o
+ .text._fstat   0x00000000       0x10 mbox_syscalls.o
+ .text._isatty  0x00000000        0x8 mbox_syscalls.o
+ .text._getpid  0x00000000        0x8 mbox_syscalls.o
+ .text._kill    0x00000000        0x8 mbox_syscalls.o
+ .text._exit    0x00000000        0x8 mbox_syscalls.o
+ .text.uart_puts
+                0x00000000       0x44 mbox_syscalls.o
+ .text.uart_init
+                0x00000000        0x4 mbox_syscalls.o
+ .text.sc1f_uart_init
+                0x00000000        0x4 mbox_syscalls.o
+ .text.sc1f_uart_putchar
+                0x00000000       0x3c mbox_syscalls.o
+ .text.sc1f_uart_tx_flush
+                0x00000000        0x4 mbox_syscalls.o
+ .sdata.heap_end
+                0x00000000        0x4 mbox_syscalls.o
+ .text          0x00000000        0x0 sc_print.o
+ .data          0x00000000        0x0 sc_print.o
+ .bss           0x00000000        0x0 sc_print.o
+ .text.printf_putch
+                0x00000000        0x8 sc_print.o
+ .text          0x00000000        0x0 core_list_join.o
+ .data          0x00000000        0x0 core_list_join.o
+ .bss           0x00000000        0x0 core_list_join.o
+ .text.copy_info
+                0x00000000       0x14 core_list_join.o
+ .text.core_list_insert_new
+                0x00000000       0x60 core_list_join.o
+ .text.core_list_remove
+                0x00000000       0x28 core_list_join.o
+ .text.core_list_undo_remove
+                0x00000000       0x20 core_list_join.o
+ .text.core_list_find
+                0x00000000       0x54 core_list_join.o
+ .text.core_list_reverse
+                0x00000000       0x24 core_list_join.o
+ .text          0x00000000        0x0 core_matrix.o
+ .data          0x00000000        0x0 core_matrix.o
+ .bss           0x00000000        0x0 core_matrix.o
+ .text.matrix_sum
+                0x00000000       0x94 core_matrix.o
+ .text.matrix_mul_const
+                0x00000000       0x58 core_matrix.o
+ .text.matrix_add_const
+                0x00000000       0x4c core_matrix.o
+ .text          0x00000000        0x0 core_main.o
+ .data          0x00000000        0x0 core_main.o
+ .bss           0x00000000        0x0 core_main.o
+ .rodata.str1.4
+                0x00000000       0x16 core_main.o
+ .data.mem_name
+                0x00000000        0xc core_main.o
+ .text          0x00000000        0x0 core_state.o
+ .data          0x00000000        0x0 core_state.o
+ .bss           0x00000000        0x0 core_state.o
+ .text          0x00000000        0x0 core_util.o
+ .data          0x00000000        0x0 core_util.o
+ .bss           0x00000000        0x0 core_util.o
+ .text.crcu8    0x00000000       0x48 core_util.o
+ .text          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .data          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .bss           0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .text          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .data          0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .bss           0x00000000        0x0 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .text          0x00000000      0x450 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_info    0x00000000      0x7e8 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_abbrev  0x00000000      0x1ca /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_loclists
+                0x00000000      0x528 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_aranges
+                0x00000000       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_rnglists
+                0x00000000       0x65 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_line    0x00000000      0xa4e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_str     0x00000000      0x23d /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .debug_line_str
+                0x00000000      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .comment       0x00000000       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .riscv.attributes
+                0x00000000       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_moddi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .eh_frame      0x00000000       0x28 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .text          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .data          0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+ .bss           0x00000000        0x0 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+TCM              0xf0000000         0x00010000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD crt.o
+LOAD core_portme.o
+LOAD mbox_syscalls.o
+LOAD sc_print.o
+LOAD core_list_join.o
+LOAD core_matrix.o
+LOAD core_main.o
+LOAD core_state.o
+LOAD core_util.o
+START GROUP
+LOAD /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a
+LOAD /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a
+END GROUP
+                0x00004000                        STACK_SIZE = 0x4000
+
+.text.crt       0xf0000000      0x504
+ FILL mask 0x00000000
+                0x00000100                        . = 0x100
+ *fill*         0xf0000000      0x100 00000000
+ *(.text.crt*)
+ .text.crt      0xf0000100      0x404 crt.o
+                0xf0000200                _start
+                0xf00003c0                handle_trap
+                0xf0000504                        . = ALIGN (0x4)
+
+.text           0xf0000504     0x2dc8
+                [!provide]                        PROVIDE (__TEXT_START__ = .)
+ *(.text .text.*)
+ .text.start_time
+                0xf0000504       0x10 core_portme.o
+                0xf0000504                start_time
+ .text.stop_time
+                0xf0000514       0x10 core_portme.o
+                0xf0000514                stop_time
+ .text.get_time
+                0xf0000524       0x18 core_portme.o
+                0xf0000524                get_time
+ .text.time_in_secs
+                0xf000053c       0x10 core_portme.o
+                0xf000053c                time_in_secs
+ .text.portable_init
+                0xf000054c       0x38 core_portme.o
+                0xf000054c                portable_init
+ .text.portable_fini
+                0xf0000584        0x8 core_portme.o
+                0xf0000584                portable_fini
+ .text.mbox_init
+                0xf000058c       0x14 mbox_syscalls.o
+                0xf000058c                mbox_init
+ .text.mbox_finish
+                0xf00005a0       0x14 mbox_syscalls.o
+                0xf00005a0                mbox_finish
+ .text.putchar  0xf00005b4       0x3c mbox_syscalls.o
+                0xf00005b4                putchar
+ .text.vprintfmt.constprop.0
+                0xf00005f0      0x478 sc_print.o
+ .text.sc_printf
+                0xf0000a68       0x44 sc_print.o
+                0xf0000a68                sc_printf
+ .text.cmp_idx  0xf0000aac       0x5c core_list_join.o
+                0xf0000aac                cmp_idx
+ .text.calc_func
+                0xf0000b08      0x124 core_list_join.o
+                0xf0000b08                calc_func
+ .text.cmp_complex
+                0xf0000c2c       0x4c core_list_join.o
+                0xf0000c2c                cmp_complex
+ .text.core_list_mergesort
+                0xf0000c78      0x150 core_list_join.o
+                0xf0000c78                core_list_mergesort
+ .text.core_bench_list
+                0xf0000dc8      0x2b0 core_list_join.o
+                0xf0000dc8                core_bench_list
+ .text.core_list_init
+                0xf0001078      0x194 core_list_join.o
+                0xf0001078                core_list_init
+ .text.core_init_matrix
+                0xf000120c      0x154 core_matrix.o
+                0xf000120c                core_init_matrix
+ .text.matrix_mul_vect
+                0xf0001360       0x58 core_matrix.o
+                0xf0001360                matrix_mul_vect
+ .text.matrix_mul_matrix
+                0xf00013b8       0xac core_matrix.o
+                0xf00013b8                matrix_mul_matrix
+ .text.matrix_mul_matrix_bitextract
+                0xf0001464       0xc0 core_matrix.o
+                0xf0001464                matrix_mul_matrix_bitextract
+ .text.matrix_test
+                0xf0001524      0x458 core_matrix.o
+                0xf0001524                matrix_test
+ .text.core_bench_matrix
+                0xf000197c       0x3c core_matrix.o
+                0xf000197c                core_bench_matrix
+ .text.iterate  0xf00019b8       0x88 core_main.o
+                0xf00019b8                iterate
+ .text.startup.main
+                0xf0001a40      0x758 core_main.o
+                0xf0001a40                main
+ .text.core_init_state
+                0xf0002198      0x194 core_state.o
+                0xf0002198                core_init_state
+ .text.core_state_transition
+                0xf000232c      0x2e8 core_state.o
+                0xf000232c                core_state_transition
+ .text.core_bench_state
+                0xf0002614      0x1bc core_state.o
+                0xf0002614                core_bench_state
+ .text.get_seed_32
+                0xf00027d0       0x64 core_util.o
+                0xf00027d0                get_seed_32
+ .text.crcu16   0xf0002834       0x8c core_util.o
+                0xf0002834                crcu16
+ .text.crcu32   0xf00028c0      0x11c core_util.o
+                0xf00028c0                crcu32
+ .text.crc16    0xf00029dc       0x94 core_util.o
+                0xf00029dc                crc16
+ .text.check_data_types
+                0xf0002a70        0x8 core_util.o
+                0xf0002a70                check_data_types
+ .text.memset   0xf0002a78       0x1c /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+                0xf0002a78                memset
+ .text.strnlen  0xf0002a94       0x24 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+                0xf0002a94                strnlen
+ .text          0xf0002ab8      0x430 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+                0xf0002ab8                __udivdi3
+ .text          0xf0002ee8      0x3e4 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+                0xf0002ee8                __umoddi3
+                [!provide]                        PROVIDE (__TEXT_END__ = .)
+
+.rodata         0xf00032cc      0x794
+                0xf0003acc                        _gp = (. + 0x800)
+ *(.srodata.cst16)
+ *(.srodata.cst8)
+ *(.srodata.cst4)
+ *(.srodata.cst2)
+ *(.srodata*)
+ *(.rodata .rodata.*)
+ .rodata.portable_init.str1.4
+                0xf00032cc      0x4bd core_portme.o
+                                 0x1c (size before relaxing)
+ .rodata.vprintfmt.constprop.0.str1.4
+                0xf0003789        0x7 sc_print.o
+ *fill*         0xf0003789        0x3 
+ .rodata.vprintfmt.constprop.0
+                0xf000378c      0x158 sc_print.o
+ .rodata.main.str1.4
+                0xf00038e4      0x3e9 core_main.o
+ .rodata.state_known_crc
+                0xf00038e4        0xa core_main.o
+ *fill*         0xf00038ee        0x2 
+ .rodata.matrix_known_crc
+                0xf00038f0        0xa core_main.o
+ *fill*         0xf00038fa        0x2 
+ .rodata.list_known_crc
+                0xf00038fc        0xa core_main.o
+ .rodata.str1.4
+                0xf0003906       0xad core_state.o
+ *fill*         0xf0003906        0x2 
+ .rodata.errpat
+                0xf0003908       0x10 core_state.o
+ .rodata.scipat
+                0xf0003918       0x10 core_state.o
+ .rodata.floatpat
+                0xf0003928       0x10 core_state.o
+ .rodata.intpat
+                0xf0003938       0x10 core_state.o
+ .rodata.get_seed_32
+                0xf0003948       0x18 core_util.o
+ .rodata        0xf0003960      0x100 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+                0xf0003960                __clz_tab
+
+.rela.dyn       0xf0003a60        0x0
+ .rela.text.crt
+                0xf0003a60        0x0 crt.o
+
+.data           0xf0003a60        0x0
+                [!provide]                        PROVIDE (__DATA_START__ = .)
+ *(.data .data.*)
+
+.sdata          0xf0003a60        0xc
+ *(.sdata .sdata.* .gnu.linkonce.s.*)
+ .sdata.default_num_contexts
+                0xf0003a60        0x4 core_portme.o
+                0xf0003a60                default_num_contexts
+ .sdata.seed4_volatile
+                0xf0003a64        0x4 core_portme.o
+                0xf0003a64                seed4_volatile
+ .sdata.seed3_volatile
+                0xf0003a68        0x4 core_portme.o
+                0xf0003a68                seed3_volatile
+                0xf0003a6c                        . = ALIGN (0x4)
+                [!provide]                        PROVIDE (__DATA_END__ = .)
+
+.tdata          0xf0003a6c        0x0
+                [!provide]                        PROVIDE (_tls_data = .)
+                0xf0003a6c                        PROVIDE (_tdata_begin = .)
+ *(.tdata .tdata.*)
+                0xf0003a6c                        . = ALIGN (0x4)
+                0xf0003a6c                        PROVIDE (_tdata_end = .)
+
+.tbss           0xf0003a6c        0x0
+                [!provide]                        PROVIDE (_tbss_begin = .)
+ *(.tbss .tbss.*)
+                0xf0003a6c                        . = ALIGN (0x4)
+                0xf0003a6c                        PROVIDE (_tbss_end = .)
+
+.sbss           0xf0003a6c       0x14
+                0xf0003a6c                        PROVIDE (__BSS_START__ = .)
+ *(.sbss .sbss.* .gnu.linkonce.sb.*)
+ .sbss.stop_time_val
+                0xf0003a6c        0x4 core_portme.o
+ .sbss.start_time_val
+                0xf0003a70        0x4 core_portme.o
+ .sbss.seed5_volatile
+                0xf0003a74        0x4 core_portme.o
+                0xf0003a74                seed5_volatile
+ .sbss.seed2_volatile
+                0xf0003a78        0x4 core_portme.o
+                0xf0003a78                seed2_volatile
+ .sbss.seed1_volatile
+                0xf0003a7c        0x4 core_portme.o
+                0xf0003a7c                seed1_volatile
+ *(.scommon)
+
+.bss            0xf0003a80      0x7d0
+ *(.bss .bss.*)
+ .bss.static_memblk
+                0xf0003a80      0x7d0 core_main.o
+                0xf0003a80                static_memblk
+ *(COMMON)
+                0xf0004250                        . = ALIGN (0x4)
+                0xf0004250                        PROVIDE (__BSS_END__ = .)
+                0xf0004250                        _end = .
+                [!provide]                        PROVIDE (__end = .)
+                0xf0004250                        PROVIDE (__heap_start = .)
+
+.stack          0xf000c000     0x4000
+                0xf000c000                        PROVIDE (__STACK_START__ = .)
+                0xf0010000                        . = (. + STACK_SIZE)
+ *fill*         0xf000c000     0x4000 
+                0xf0010000                        PROVIDE (__C_STACK_TOP__ = .)
+                [!provide]                        PROVIDE (__STACK_END__ = .)
+
+/DISCARD/
+ *(.eh_frame .eh_frame.*)
+OUTPUT(coremark_tcm.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x43
+ .riscv.attributes
+                0x00000000       0x41 crt.o
+ .riscv.attributes
+                0x00000041       0x43 core_portme.o
+ .riscv.attributes
+                0x00000084       0x43 mbox_syscalls.o
+ .riscv.attributes
+                0x000000c7       0x3f sc_print.o
+ .riscv.attributes
+                0x00000106       0x3f core_list_join.o
+ .riscv.attributes
+                0x00000145       0x3f core_matrix.o
+ .riscv.attributes
+                0x00000184       0x3f core_main.o
+ .riscv.attributes
+                0x000001c3       0x3f core_state.o
+ .riscv.attributes
+                0x00000202       0x3f core_util.o
+ .riscv.attributes
+                0x00000241       0x28 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .riscv.attributes
+                0x00000269       0x2a /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .riscv.attributes
+                0x00000293       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .riscv.attributes
+                0x000002bd       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .riscv.attributes
+                0x000002e7       0x2a /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.comment        0x00000000       0x22
+ .comment       0x00000000       0x22 core_portme.o
+                                 0x23 (size before relaxing)
+ .comment       0x00000022       0x23 mbox_syscalls.o
+ .comment       0x00000022       0x23 sc_print.o
+ .comment       0x00000022       0x23 core_list_join.o
+ .comment       0x00000022       0x23 core_matrix.o
+ .comment       0x00000022       0x23 core_main.o
+ .comment       0x00000022       0x23 core_state.o
+ .comment       0x00000022       0x23 core_util.o
+ .comment       0x00000022       0x23 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .comment       0x00000022       0x23 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_line     0x00000000     0x13c1
+ .debug_line    0x00000000       0x6e /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .debug_line    0x0000006e       0xac /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_line    0x0000011a      0x905 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_line    0x00000a1f      0x963 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_line    0x00001382       0x3f /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_line_str
+                0x00000000      0x182
+ .debug_line_str
+                0x00000000      0x182 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+                                 0x42 (size before relaxing)
+ .debug_line_str
+                0x00000182       0xbb /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_line_str
+                0x00000182      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_line_str
+                0x00000182      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_line_str
+                0x00000182      0x148 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_info     0x00000000     0x10f7
+ .debug_info    0x00000000       0x31 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .debug_info    0x00000031       0xd9 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_info    0x0000010a      0x761 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_info    0x0000086b      0x7b4 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_info    0x0000101f       0xd8 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_abbrev   0x00000000      0x471
+ .debug_abbrev  0x00000000       0x28 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .debug_abbrev  0x00000028       0x89 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_abbrev  0x000000b1      0x1a6 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_abbrev  0x00000257      0x1aa /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_abbrev  0x00000401       0x70 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_aranges  0x00000000       0x98
+ .debug_aranges
+                0x00000000       0x20 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+ .debug_aranges
+                0x00000020       0x20 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_aranges
+                0x00000040       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_aranges
+                0x00000060       0x20 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_aranges
+                0x00000080       0x18 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_str      0x00000000      0x3eb
+ .debug_str     0x00000000      0x3eb /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(memset.S.o)
+                                 0x55 (size before relaxing)
+ .debug_str     0x000003eb      0x18a /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_str     0x000003eb      0x23e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_str     0x000003eb      0x23e /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+ .debug_str     0x000003eb      0x18b /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_clz.o)
+
+.debug_loclists
+                0x00000000      0xd37
+ .debug_loclists
+                0x00000000       0xad /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_loclists
+                0x000000ad      0x704 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_loclists
+                0x000007b1      0x586 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+
+.debug_rnglists
+                0x00000000      0x112
+ .debug_rnglists
+                0x00000000       0x13 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)
+ .debug_rnglists
+                0x00000013       0x99 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_udivdi3.o)
+ .debug_rnglists
+                0x000000ac       0x66 /usr/lib/gcc/riscv64-unknown-elf/13.2.0/rv32im/ilp32/libgcc.a(_umoddi3.o)
+
+.debug_frame    0x00000000       0x20
+ .debug_frame   0x00000000       0x20 /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32im/ilp32/libc.a(libc_string_strnlen.c.o)

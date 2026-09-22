@@ -65,6 +65,10 @@ module scr1_core_top (
     output  logic                                   core2imem_req_o,            // IMEM request
     output  type_scr1_mem_cmd_e                     core2imem_cmd_o,            // IMEM command
     output  logic [`SCR1_IMEM_AWIDTH-1:0]           core2imem_addr_o,           // IMEM address
+`ifdef SCR1_BP_IBTB_FS
+    output  logic                                   core2imem_pf_req_o,         // I-cache prefetch hint valid
+    output  logic [`SCR1_IMEM_AWIDTH-1:0]           core2imem_pf_addr_o,        // I-cache prefetch target
+`endif // SCR1_BP_IBTB_FS
     input   logic [`SCR1_IMEM_DWIDTH-1:0]           imem2core_rdata_i,          // IMEM read data
     input   type_scr1_mem_resp_e                    imem2core_resp_i,           // IMEM response
 
@@ -76,9 +80,15 @@ module scr1_core_top (
     output  logic [`SCR1_DMEM_AWIDTH-1:0]           core2dmem_addr_o,           // DMEM address
     output  logic [`SCR1_DMEM_DWIDTH-1:0]           core2dmem_wdata_o,          // DMEM write data
     input   logic [`SCR1_DMEM_DWIDTH-1:0]           dmem2core_rdata_i,          // DMEM read data
-    input   type_scr1_mem_resp_e                    dmem2core_resp_i,            // DMEM response
-    
-    output logic                                    core2axi_fencei_req_o
+    input   type_scr1_mem_resp_e                    dmem2core_resp_i            // DMEM response
+`ifdef SCR1_RVFI_EN
+    ,
+    // RVFI-lite trace tap -> SoC trace BRAM
+    output  logic                                   rvfi_trace_we_o,
+    output  logic [12:0]                            rvfi_trace_waddr_o,
+    output  logic [127:0]                           rvfi_trace_wdata_o,
+    output  logic [31:0]                            rvfi_trace_count_o
+`endif // SCR1_RVFI_EN
 );
 
 //-------------------------------------------------------------------------------
@@ -186,6 +196,7 @@ logic                                           clk_pipe_en;
 logic                                           clk_dbgc;
 logic                                           clk_alw_on;
 `endif // SCR1_CLKCTRL_EN
+
 
 //-------------------------------------------------------------------------------
 // Reset Logic
@@ -296,6 +307,10 @@ scr1_pipe_top i_pipe_top (
     .pipe2imem_req_o                (core2imem_req_o        ),
     .pipe2imem_cmd_o                (core2imem_cmd_o        ),
     .pipe2imem_addr_o               (core2imem_addr_o       ),
+`ifdef SCR1_BP_IBTB_FS
+    .pipe2imem_pf_req_o             (core2imem_pf_req_o     ),
+    .pipe2imem_pf_addr_o            (core2imem_pf_addr_o    ),
+`endif // SCR1_BP_IBTB_FS
     .imem2pipe_req_ack_i            (imem2core_req_ack_i    ),
     .imem2pipe_rdata_i              (imem2core_rdata_i      ),
     .imem2pipe_resp_i               (imem2core_resp_i       ),
@@ -352,8 +367,14 @@ scr1_pipe_top i_pipe_top (
     .soc2pipe_mtimer_val_i          (core_mtimer_val_i      ),
 
     // Fuse
-    .soc2pipe_fuse_mhartid_i        (core_fuse_mhartid_i    ),
-    .pipe2core_fencei_req_o         (core2axi_fencei_req_o)
+    .soc2pipe_fuse_mhartid_i        (core_fuse_mhartid_i    )
+`ifdef SCR1_RVFI_EN
+    ,
+    .rvfi2soc_trace_we_o            (rvfi_trace_we_o        ),
+    .rvfi2soc_trace_waddr_o         (rvfi_trace_waddr_o     ),
+    .rvfi2soc_trace_wdata_o         (rvfi_trace_wdata_o     ),
+    .rvfi2soc_trace_count_o         (rvfi_trace_count_o     )
+`endif // SCR1_RVFI_EN
 );
 
 

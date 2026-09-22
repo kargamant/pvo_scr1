@@ -175,6 +175,14 @@ parameter int unsigned SCR1_BP_BTB_IDX_W = $clog2(SCR1_BP_BTB_SIZE); // BTB inde
 // IFU fetch-queue depth in 32-bit words
 parameter int unsigned SCR1_IFU_QUEUE_SIZE_WORD = 2;
 
+// I/D cache geometry (kargamant/pvo_scr1 @ cache: geometry parametrised).
+// Defaults for the scr1_icache/scr1_dcache NUM_LINES/LINE_WORDS params.
+// 64 lines x 4 words = 1 KiB direct-mapped per cache.
+parameter int unsigned SCR1_ICACHE_NUM_LINES  = 64;
+parameter int unsigned SCR1_ICACHE_LINE_WORDS = 4;
+parameter int unsigned SCR1_DCACHE_NUM_LINES  = 64;
+parameter int unsigned SCR1_DCACHE_LINE_WORDS = 4;
+
 // Bypasses on AXI/AHB bridge I/O
 `define SCR1_IMEM_AHB_IN_BP         // bypass instruction memory AHB bridge input register
 `define SCR1_IMEM_AHB_OUT_BP        // bypass instruction memory AHB bridge output register

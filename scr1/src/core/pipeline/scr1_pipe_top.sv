@@ -100,6 +100,14 @@ module scr1_pipe_top (
 
     // Fuse
     input   logic [`SCR1_XLEN-1:0]                      soc2pipe_fuse_mhartid_i     // Fuse MHARTID value
+`ifdef SCR1_RVFI_EN
+    ,
+    // RVFI-lite trace tap -> SoC trace BRAM (on-chip co-verification)
+    output  logic                                       rvfi2soc_trace_we_o,
+    output  logic [12:0]                                rvfi2soc_trace_waddr_o,
+    output  logic [127:0]                               rvfi2soc_trace_wdata_o,
+    output  logic [31:0]                                rvfi2soc_trace_count_o
+`endif // SCR1_RVFI_EN
 );
 
 //-------------------------------------------------------------------------------
@@ -833,6 +841,43 @@ assign brkpt_qlfy               = brkpt             & {$bits(brkpt){pipe2hdu_rdc
 assign ifu2hdu_pbuf_rdy_qlfy    = ifu2hdu_pbuf_rdy  & {$bits(ifu2hdu_pbuf_rdy){pipe2hdu_rdc_qlfy_i}};
 
 `endif // SCR1_DBG_EN
+
+`ifdef SCR1_RVFI_EN
+//-------------------------------------------------------------------------------
+// RVFI-lite retire tap (synthesizable) for on-chip co-verification. Pure observation.
+// Outputs kept internal here (Stage 3a: tb reads them hierarchically to validate the
+// module vs the ISA model). Stage 3b brings trace_we/waddr/wdata/count out to the BD
+// trace BRAM + PS bridge.
+//-------------------------------------------------------------------------------
+logic          rvfi_valid;
+logic [127:0]  rvfi_rec;
+logic          rvfi_trace_we;
+logic [12:0]   rvfi_trace_waddr;
+logic [127:0]  rvfi_trace_wdata;
+logic [31:0]   rvfi_trace_count;
+
+scr1_rvfi_lite #(.ADDR_W(13)) i_rvfi (
+    .clk          (clk              ),
+    .rst_n        (pipe_rst_n       ),  // was (rst_n) — undriven net held the capture counter in reset
+    .instret      (instret          ),
+    .instret_nexc (instret_nexc     ),
+    .pc           (curr_pc          ),
+    .pc_next      (next_pc          ),
+    .rd_wen       (exu2mprf_w_req   ),
+    .rd_addr      (exu2mprf_rd_addr[4:0]),
+    .rd_wdata     (exu2mprf_rd_data ),
+    .rvfi_valid   (rvfi_valid       ),
+    .rvfi_rec     (rvfi_rec         ),
+    .trace_we     (rvfi_trace_we    ),
+    .trace_waddr  (rvfi_trace_waddr ),
+    .trace_wdata  (rvfi_trace_wdata ),
+    .trace_count  (rvfi_trace_count )
+);
+assign rvfi2soc_trace_we_o    = rvfi_trace_we;
+assign rvfi2soc_trace_waddr_o = rvfi_trace_waddr;
+assign rvfi2soc_trace_wdata_o = rvfi_trace_wdata;
+assign rvfi2soc_trace_count_o = rvfi_trace_count;
+`endif // SCR1_RVFI_EN
 
 `ifdef SCR1_TRGT_SIMULATION
 //-------------------------------------------------------------------------------

@@ -145,6 +145,14 @@ module scr1_top_axi (
     input   logic [3:0]                             io_axi_dmem_ruser,
     input   logic                                   io_axi_dmem_rvalid,
     output  logic                                   io_axi_dmem_rready
+`ifdef SCR1_RVFI_EN
+    ,
+    // RVFI-lite trace tap -> SoC trace BRAM (on-chip co-verification)
+    output  logic                                   rvfi_trace_we_o,
+    output  logic [12:0]                            rvfi_trace_waddr_o,
+    output  logic [127:0]                           rvfi_trace_wdata_o,
+    output  logic [31:0]                            rvfi_trace_count_o
+`endif // SCR1_RVFI_EN
 );
 
 //-------------------------------------------------------------------------------
@@ -172,6 +180,10 @@ type_scr1_mem_cmd_e                                 core_imem_cmd;
 logic [`SCR1_IMEM_AWIDTH-1:0]                       core_imem_addr;
 logic [`SCR1_IMEM_DWIDTH-1:0]                       core_imem_rdata;
 type_scr1_mem_resp_e                                core_imem_resp;
+`ifdef SCR1_BP_IBTB_FS
+logic                                               core_imem_pf_req;   // I-cache prefetch hint (side-band, bypasses imem router)
+logic [`SCR1_IMEM_AWIDTH-1:0]                       core_imem_pf_addr;
+`endif // SCR1_BP_IBTB_FS
 
 // Data memory interface from core to router
 logic                                               core_dmem_req_ack;
@@ -182,11 +194,6 @@ logic [`SCR1_DMEM_AWIDTH-1:0]                       core_dmem_addr;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_wdata;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
-
-logic                                               fencei_req;
-logic                                               fencei_pending;
-logic                                               icache_invalidate_req;
-logic                                               icache_invalidate_ack;
 
 // Instruction memory interface from router port 0 to cache
 logic                                               cache_imem_req_ack;
@@ -367,6 +374,10 @@ scr1_core_top i_core_top (
     .core2imem_req_o            (core_imem_req    ),
     .core2imem_cmd_o            (core_imem_cmd    ),
     .core2imem_addr_o           (core_imem_addr   ),
+`ifdef SCR1_BP_IBTB_FS
+    .core2imem_pf_req_o         (core_imem_pf_req ),
+    .core2imem_pf_addr_o        (core_imem_pf_addr),
+`endif // SCR1_BP_IBTB_FS
     .imem2core_rdata_i          (core_imem_rdata  ),
     .imem2core_resp_i           (core_imem_resp   ),
 
@@ -378,24 +389,15 @@ scr1_core_top i_core_top (
     .core2dmem_addr_o           (core_dmem_addr   ),
     .core2dmem_wdata_o          (core_dmem_wdata  ),
     .dmem2core_rdata_i          (core_dmem_rdata  ),
-    .dmem2core_resp_i           (core_dmem_resp   ),
-    .core2axi_fencei_req_o      (fencei_req)
+    .dmem2core_resp_i           (core_dmem_resp   )
+`ifdef SCR1_RVFI_EN
+    ,
+    .rvfi_trace_we_o            (rvfi_trace_we_o    ),
+    .rvfi_trace_waddr_o         (rvfi_trace_waddr_o ),
+    .rvfi_trace_wdata_o         (rvfi_trace_wdata_o ),
+    .rvfi_trace_count_o         (rvfi_trace_count_o )
+`endif // SCR1_RVFI_EN
 );
-
-// Hold the FENCE.I maintenance request until I-cache acknowledges it.  The
-// direct fencei_req term prevents I-cache from accepting a new instruction
-// request in the same cycle in which FENCE.I is executed.
-assign icache_invalidate_req = fencei_req | fencei_pending;
-
-always_ff @(posedge clk, negedge core_rst_n_local) begin
-    if (~core_rst_n_local) begin
-        fencei_pending <= 1'b0;
-    end else if (icache_invalidate_ack) begin
-        fencei_pending <= 1'b0;
-    end else if (fencei_req) begin
-        fencei_pending <= 1'b1;
-    end
-end
 
 
 //-------------------------------------------------------------------------------
@@ -404,22 +406,25 @@ end
 // Data path: dmem router port 0 -> D-cache -> AXI bridge.
 //-------------------------------------------------------------------------------
 scr1_cache_wrapper #(
-    // Cache only the 128 MiB DDR2 window: 0x0000_0000 - 0x07FF_FFFF.
-    // The imem router sends TCM requests directly to TCM, so they never enter
-    // I-cache. Boot BRAM and external MMIO still use the I-cache bypass path.
-    // The dmem router likewise sends TCM and timer requests around D-cache.
+    // Cache the 128 MiB SCR1 DDR window on VD100: 0x7000_0000 - 0x77FF_FFFF.
+    // (was 0x0-0x07FF_FFFF, the old Nexys4DDR DDR2 map — wrong for this board, so
+    //  the DDR-resident workload ran fully uncached.) The imem router sends TCM
+    // requests directly to TCM, so they never enter I-cache. Boot BRAM (0xFFFF0000)
+    // and external MMIO still use the I-cache bypass path. The dmem router likewise
+    // sends TCM and timer requests around D-cache.
     .ICACHE_ADDR_MASK     (32'hF800_0000),
-    .ICACHE_ADDR_PATTERN  ('0),
+    .ICACHE_ADDR_PATTERN  (32'h7000_0000),
     .DCACHE_ADDR_MASK     (32'hF800_0000),
-    .DCACHE_ADDR_PATTERN  ('0)
+    .DCACHE_ADDR_PATTERN  (32'h7000_0000)
 ) i_cache_wrapper (
     .clk                     (clk                 ),
     .rst_n                   (core_rst_n_local    ),
 
-    // FENCE.I invalidates I-cache. D-cache is write-through, so runtime flush
-    // remains disabled; reset still invalidates both caches.
-    .icache_invalidate_i     (icache_invalidate_req),
-    .icache_invalidate_ack_o (icache_invalidate_ack),
+    // Runtime maintenance is not exposed by scr1_core_top yet.  Both caches
+    // are invalidated by reset; connect these inputs when FENCE.I/flush
+    // control is added to the core integration.
+    .icache_invalidate_i     (1'b0                ),
+    .icache_invalidate_ack_o (                    ),
     .dcache_flush_i          (1'b0                ),
     .dcache_flush_ack_o      (                    ),
 
@@ -428,6 +433,10 @@ scr1_cache_wrapper #(
     .core2imem_req_i         (cache_imem_req      ),
     .core2imem_cmd_i         (cache_imem_cmd      ),
     .core2imem_addr_i        (cache_imem_addr     ),
+    // NOTE: the updated cache (kargamant/pvo_scr1 @ cache) dropped the fetch-side
+    // prefetch-hint port (core2imem_pf_*). It was only used by SCR1_BP_IBTB_FS,
+    // which is disabled in this config, so nothing active is lost. If IBTB_FS is
+    // re-enabled later, prefetch support must be re-added to the new icache first.
     .imem2core_rdata_o       (cache_imem_rdata    ),
     .imem2core_resp_o        (cache_imem_resp     ),
 

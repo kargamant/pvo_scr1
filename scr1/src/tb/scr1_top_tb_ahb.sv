@@ -389,6 +389,39 @@ scr1_memory_tb_ahb #(
     .dmem_hresp             (dmem_hresp )
 );
 
+`ifdef SCR1_RVFI_TRACE
+//-------------------------------------------------------------------------------
+// RVFI-lite architectural trace for on-chip co-verification bring-up (Stage 1).
+// One line per RETIRED instruction, sampled at the retire cycle (same point as the
+// RPC trace). This is the golden-comparable committed stream: an ISA reference model
+// executing the SAME program must produce an identical sequence.
+//   RVFI <order> <pc> <pc_next> <rd_addr> <rd_wdata> <trap>
+// rd_addr/rd_wdata are 0 when there is no architectural register write (or write x0).
+// trap = retired WITH exception (instret & ~instret_nexc).
+// Pure observation: hierarchical reads only, no drive, no timing effect.
+//-------------------------------------------------------------------------------
+// Sourced from the SYNTHESIZABLE tap module scr1_rvfi_lite (unpacks its 128-bit record),
+// so this validates the real hardware tap (Stage 3a), not just raw pipeline signals.
+// Requires -DSCR1_RVFI_EN (module) + -DSCR1_RVFI_TRACE (dump).
+longint unsigned rvfi_order = 0;
+integer          rvfi_fd    = 0;
+always_ff @(posedge clk) begin
+    if (rst_n & i_top.i_core_top.i_pipe_top.i_rvfi.rvfi_valid) begin
+        automatic logic [127:0] rec = i_top.i_core_top.i_pipe_top.i_rvfi.rvfi_rec;
+        // Dedicated file so the UART $write stream cannot interleave into an RVFI line.
+        if (rvfi_fd == 0) rvfi_fd = $fopen("rvfi_dut.log", "w");
+        $fdisplay(rvfi_fd, "RVFI %0d %08h %08h %0d %08h %0d",
+                 rvfi_order,
+                 rec[31:0],      // pc
+                 rec[63:32],     // pc_next
+                 rec[100:96],    // rd_addr
+                 rec[95:64],     // rd_wdata
+                 rec[101]);      // trap
+        rvfi_order <= rvfi_order + 1;
+    end
+end
+`endif // SCR1_RVFI_TRACE
+
 //-------------------------------------------------------------------------------
 // Phase-0 branch-predictor profiling (tb-only, opt-in via -DSCR1_BP_PROFILE).
 // Pure observation of DUT signals: no drive, no effect on core logic/timing.
