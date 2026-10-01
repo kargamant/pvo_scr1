@@ -11,6 +11,8 @@ images/nexys4ddr/scr1/dhry21-o3lto.bin
 **/nexys4ddr_scr1/nexys4ddr_scr1.ip_user_files/
 **/nexys4ddr_scr1/nexys4ddr_scr1.runs/
 **/nexys4ddr_scr1/nexys4ddr_scr1.sim/
+**/alinx_ve2302/build/
+**/alinx_ve2302/scr1/build/
 
 # Ignore after authored sources/IP configs are moved elsewhere
 **/nexys4ddr_scr1/nexys4ddr_scr1.srcs/
