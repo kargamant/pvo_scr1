@@ -6,6 +6,29 @@
 Исходный проект: `fpga/nexys4ddr/scr1/`. Он остаётся рабочим и служит
 референсом — здесь ничего из него не удаляется.
 
+## Сборка
+
+Все команды запускаются из `fpga/alinx_ve2302/scr1/` после подключения
+окружения Vivado 2023.2. Для изменения `image.ub` также нужны Device Tree
+Compiler (`dtc`) и `u-boot-tools` (`dumpimage`, `mkimage`):
+
+```bash
+sudo apt install device-tree-compiler u-boot-tools
+```
+
+1. `vivado -mode batch -source tcl/create_project_ps.tcl` — создать проект
+   PS + SCR1 и получить исходный PDI.
+2. `PS_WRAPPER=<путь-к-сгенерированному-врапперу.v> ./tcl/patch_boot_bram.sh ps`
+   — указать `mem/scbl_le.mem` как файл инициализации boot BRAM в сгенерированном
+   враппере.
+3. `vivado -mode batch -source tcl/build_patched.tcl -tclargs ps` — пересобрать
+   проект с этой инициализацией и получить PDI с загрузчиком SCR1.
+4. `tools/make_bootbin.sh <PDI> <исходный_BOOT.BIN> <новый_BOOT.BIN>` — заменить
+   PDI в загрузочном образе, сохранив APU-разделы исходного `BOOT.BIN`.
+5. `tools/fix_dt.sh <исходный_image.ub> <новый_image.ub>` — удалить из Device
+   Tree отсутствующую PL-периферию ALINX и зарезервировать верхние 256 МБ DDR
+   для SCR1.
+
 ## Что переносится без изменений
 
 RTL ядра и периферии оказался переносимым: в `scr1/src` и `doom/rtl` нет
