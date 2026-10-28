@@ -5,9 +5,10 @@ LD = $(CC)
 OBJDUMP = $(CROSS_PREFIX)objdump
 OBJCOPY = $(CROSS_PREFIX)objcopy
 
-MARCH ?= rv32im
+MARCH ?= rv32im_zicsr_zifencei
 MABI ?= ilp32
-MEM ?= tcm
+#MEM ?= tcm
+MEM ?= ddr
 OPT ?= 2
 SYS_CLK ?= 25000000
 RTC_HZ ?= 1000000
