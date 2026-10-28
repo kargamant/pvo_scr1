@@ -76,7 +76,9 @@ module scr1_core_top (
     output  logic [`SCR1_DMEM_AWIDTH-1:0]           core2dmem_addr_o,           // DMEM address
     output  logic [`SCR1_DMEM_DWIDTH-1:0]           core2dmem_wdata_o,          // DMEM write data
     input   logic [`SCR1_DMEM_DWIDTH-1:0]           dmem2core_rdata_i,          // DMEM read data
-    input   type_scr1_mem_resp_e                    dmem2core_resp_i            // DMEM response
+    input   type_scr1_mem_resp_e                    dmem2core_resp_i,            // DMEM response
+    
+    output logic                                    core2axi_fencei_req_o
 );
 
 //-------------------------------------------------------------------------------
@@ -184,7 +186,6 @@ logic                                           clk_pipe_en;
 logic                                           clk_dbgc;
 logic                                           clk_alw_on;
 `endif // SCR1_CLKCTRL_EN
-
 
 //-------------------------------------------------------------------------------
 // Reset Logic
@@ -351,7 +352,8 @@ scr1_pipe_top i_pipe_top (
     .soc2pipe_mtimer_val_i          (core_mtimer_val_i      ),
 
     // Fuse
-    .soc2pipe_fuse_mhartid_i        (core_fuse_mhartid_i    )
+    .soc2pipe_fuse_mhartid_i        (core_fuse_mhartid_i    ),
+    .pipe2core_fencei_req_o         (core2axi_fencei_req_o)
 );
 
 

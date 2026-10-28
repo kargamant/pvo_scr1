@@ -46,6 +46,7 @@ module scr1_pipe_top (
     input   logic                                       dmem2pipe_req_ack_i,        // DMEM request acknowledge
     input   logic [`SCR1_DMEM_DWIDTH-1:0]               dmem2pipe_rdata_i,          // DMEM read data
     input   type_scr1_mem_resp_e                        dmem2pipe_resp_i,           // DMEM response
+    output  logic                                        pipe2core_fencei_req_o,
 
 `ifdef SCR1_DBG_EN
     // Debug interface:
@@ -507,6 +508,7 @@ scr1_pipe_exu i_pipe_exu (
     .exu2pipe_pc_curr_o             (curr_pc                 ),
     .exu2csr_pc_next_o              (next_pc                 ),
     .exu2ifu_pc_new_req_o           (new_pc_req              ),
+    .exu2pipe_fencei_req_o          (pipe2core_fencei_req_o  ),
     .exu2ifu_pc_new_o               (new_pc                  )
 `ifdef SCR1_BP_RAS_EN
     ,

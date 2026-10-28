@@ -54,3 +54,6 @@ Thumbs.db
 # Local AI workspace metadata, unless intentionally shared
 **/.claude/
 **/.agents/
+
+# Just rand files  
+scr1/src/core/cache/CACHE_IMPLEMENTATION_RU.md

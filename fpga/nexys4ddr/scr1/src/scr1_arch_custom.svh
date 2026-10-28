@@ -18,6 +18,14 @@
 // Uncomment to enable local ILA debug instrumentation
 //`define SCR1_DEBUG_ILA
 
+// Uncomment to enable 32-bit I-cache and D-cache performance counters.
+// Counter ILAs additionally require SCR1_DEBUG_ILA.
+//`define SCR1_CACHE_PERF_COUNTERS
+
+// Enable the targeted I-cache request/refill/invalidation trace. This reuses
+// an existing performance ILA without enabling the other local debug ILAs.
+`define SCR1_ICACHE_INVALIDATE_ILA
+
 
 
 // Uncomment to select recommended core architecture configurations
@@ -37,5 +45,11 @@ parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TCM_ADDR_PATTERN       = 'hF0000000
 
 parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TIMER_ADDR_MASK        = 'hFFFFFFE0;   // Timer mask (should be 0xFFFFFFE0)
 parameter bit [`SCR1_DMEM_AWIDTH-1:0]   SCR1_TIMER_ADDR_PATTERN     = 'hF0040000;   // Timer address match pattern
+
+// Cache geometry
+parameter int unsigned                  SCR1_ICACHE_NUM_LINES       = 64;
+parameter int unsigned                  SCR1_ICACHE_LINE_WORDS      = 4;
+parameter int unsigned                  SCR1_DCACHE_NUM_LINES       = 64;
+parameter int unsigned                  SCR1_DCACHE_LINE_WORDS      = 4;
 
 `endif // SCR1_ARCH_CUSTOM_SVH

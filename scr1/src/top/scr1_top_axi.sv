@@ -183,6 +183,11 @@ logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_wdata;
 logic [`SCR1_DMEM_DWIDTH-1:0]                       core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
 
+logic                                               fencei_req;
+logic                                               fencei_pending;
+logic                                               icache_invalidate_req;
+logic                                               icache_invalidate_ack;
+
 // Instruction memory interface from router port 0 to cache
 logic                                               cache_imem_req_ack;
 logic                                               cache_imem_req;
@@ -373,8 +378,24 @@ scr1_core_top i_core_top (
     .core2dmem_addr_o           (core_dmem_addr   ),
     .core2dmem_wdata_o          (core_dmem_wdata  ),
     .dmem2core_rdata_i          (core_dmem_rdata  ),
-    .dmem2core_resp_i           (core_dmem_resp   )
+    .dmem2core_resp_i           (core_dmem_resp   ),
+    .core2axi_fencei_req_o      (fencei_req)
 );
+
+// Hold the FENCE.I maintenance request until I-cache acknowledges it.  The
+// direct fencei_req term prevents I-cache from accepting a new instruction
+// request in the same cycle in which FENCE.I is executed.
+assign icache_invalidate_req = fencei_req | fencei_pending;
+
+always_ff @(posedge clk, negedge core_rst_n_local) begin
+    if (~core_rst_n_local) begin
+        fencei_pending <= 1'b0;
+    end else if (icache_invalidate_ack) begin
+        fencei_pending <= 1'b0;
+    end else if (fencei_req) begin
+        fencei_pending <= 1'b1;
+    end
+end
 
 
 //-------------------------------------------------------------------------------
@@ -395,11 +416,10 @@ scr1_cache_wrapper #(
     .clk                     (clk                 ),
     .rst_n                   (core_rst_n_local    ),
 
-    // Runtime maintenance is not exposed by scr1_core_top yet.  Both caches
-    // are invalidated by reset; connect these inputs when FENCE.I/flush
-    // control is added to the core integration.
-    .icache_invalidate_i     (1'b0                ),
-    .icache_invalidate_ack_o (                    ),
+    // FENCE.I invalidates I-cache. D-cache is write-through, so runtime flush
+    // remains disabled; reset still invalidates both caches.
+    .icache_invalidate_i     (icache_invalidate_req),
+    .icache_invalidate_ack_o (icache_invalidate_ack),
     .dcache_flush_i          (1'b0                ),
     .dcache_flush_ack_o      (                    ),
 
