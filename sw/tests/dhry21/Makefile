@@ -22,7 +22,7 @@ FLAGS_ += $(XCFLAGS)
 FLAGS_STR = "$(FLAGS_)"
 
 CFLAGS = -static -Wa,-march=$(MARCH) -march=$(MARCH) -mabi=$(MABI) -std=gnu99 $(PORT_CFLAGS) $(XLFLAGS) -fno-common -fno-builtin-printf -DFLAGS_STR=\"$(FLAGS_STR)\"
-LFLAGS = -march=$(MARCH) -mabi=$(MABI) -nostartfiles -nostdlib $(XLFLAGS) -lc -lgcc
+LFLAGS = -march=$(MARCH) -mabi=$(MABI) -nostartfiles -nostdlib $(XLFLAGS) -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
 
 CFLAGS += -DITERATIONS=$(ITERATIONS)
 
@@ -43,15 +43,15 @@ dhry21_elf = $(build_dir)dhry21$(build_siffix).elf
 dhry21_bin = $(build_dir)dhry21$(build_siffix).bin
 dhry21_map = $(build_dir)dhry21$(build_siffix).map
 
-$(dhry21_elf): $(ld_script) $(dhry21_asm_objs) $(dhry21_c_objs)
+ $(dhry21_elf): $(ld_script) $(dhry21_asm_objs) $(dhry21_c_objs)
 	$(LD) $(incs) -o $@ -Wl,-Map=$(dhry21_map) -T $^ $(LFLAGS)
 	$(OBJCOPY) -Obinary -S $@ $(dhry21_bin)
-	$(RM) $(build_dir)*.o
-	$(RM) $(dhry21_elf)
-	$(RM) $(dhry21_map)
+#	$(RM) $(build_dir)*.o
+#	$(RM) $(dhry21_elf)
+#	$(RM) $(dhry21_map)
 
 bmarks_riscv_elf = $(dhry21_elf)
-bmarks_riscv_dump =$(build_dir)dhry21.$(build_siffix).dump
+bmarks_riscv_dump =$(build_dir)dhry21$(build_siffix).dump
 
 $(bmarks_riscv_dump): $(bmarks_riscv_elf)
 
